@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d14">
+  <title>Inloggen · ToDo</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    try { const t = localStorage.getItem('klaar.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body class="login-page">
+  <main class="login">
+    <div class="login-card" id="loginCard">
+      <div class="login-brand">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8.5 13.5l4 4L23.5 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 24h14" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/></svg></span>
+        <span class="wordmark">To<span>Do</span></span>
+      </div>
+      <h1>Welkom terug</h1>
+      <p class="login-sub">Log in om je taken te zien.</p>
+
+      <form id="loginForm" novalidate>
+        <label class="login-field">
+          <span>Gebruikersnaam</span>
+          <input class="input" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+        </label>
+        <label class="login-field">
+          <span>Wachtwoord</span>
+          <span class="pw-wrap">
+            <input class="input" name="password" type="password" autocomplete="current-password" required>
+            <button type="button" class="icon-btn small pw-toggle" id="pwToggle" aria-label="Wachtwoord tonen" title="Wachtwoord tonen">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </span>
+        </label>
+        <label class="remember"><input type="checkbox" name="remember" checked> Ingelogd blijven</label>
+        <p class="login-error" id="loginError" role="alert" hidden></p>
+        <button class="btn primary login-btn" type="submit" id="loginBtn">Inloggen</button>
+      </form>
+    </div>
+  </main>
+  <script src="/login.js"></script>
+</body>
+</html>

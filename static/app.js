@@ -14,6 +14,11 @@ async function api(method, url, body) {
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) {
+    // Session expired or logged out elsewhere: back to the login page, then return here.
+    location.href = '/login?next=' + encodeURIComponent(location.pathname);
+    return new Promise(() => {});
+  }
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).error || msg; } catch {}
@@ -61,6 +66,7 @@ const ICONS = {
   grid: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M9 9v12M15 9v12M3 15h18"/></svg>',
   left: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="3"/><path d="M16 8V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h2"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
@@ -231,7 +237,7 @@ function renderSidebar() {
   const dark = document.documentElement.dataset.theme === 'dark'
     || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   $('#themeToggle').innerHTML = dark ? ICONS.sun : ICONS.moon;
-  $('#brandDate').textContent = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#brandDate').textContent = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' });
 }
 
 function viewGroups() {
@@ -325,6 +331,7 @@ function renderTodo(t, sortable) {
         <div class="title">${esc(t.title)}</div>
         <div class="meta">${meta.join('')}</div>
       </div>
+      ${t.done ? '' : `<button class="icon-btn row-act" data-act="snooze" aria-label="Uitstellen" title="Uitstellen">${ICONS.clock}</button>`}
       <button class="icon-btn row-act" data-act="duplicate" aria-label="Dupliceren" title="Dupliceren">${ICONS.copy}</button>
       <button class="icon-btn row-act danger" data-act="delete" aria-label="Verwijderen" title="Verwijderen">${ICONS.trash}</button>
     </li>`;
@@ -359,6 +366,7 @@ function renderAgendaItem(t) {
         style="--cc:${cl ? cl.color : 'var(--border-strong)'}" title="${esc(tip)}">
       <button class="mini-check" data-act="toggle" aria-label="${t.done ? 'Markeer als open' : 'Afvinken'}">${ICONS.check}</button>
       <span class="ag-title">${esc(t.title)}</span>
+      ${t.done ? '' : `<button class="ag-snooze" data-act="snooze" aria-label="Uitstellen" title="Uitstellen">${ICONS.clock}</button>`}
     </li>`;
 }
 
@@ -517,10 +525,7 @@ function renderDrawer() {
         <label for="dDue">Deadline</label>
         <input type="date" id="dDue" value="${t.due || ''}">
         <div class="date-row">
-          <button class="pill" data-due="${today()}">Vandaag</button>
-          <button class="pill" data-due="${addDays(1)}">Morgen</button>
-          <button class="pill" data-due="${parseDate('volgendeweek')}">Volgende week</button>
-          ${t.due ? '<button class="pill" data-due="">Geen datum</button>' : ''}
+          ${snoozeOptions(t).map((o) => `<button class="pill" data-due="${o.due ?? ''}" title="${o.due ? shortDate(o.due) : ''}">${o.label}</button>`).join('')}
         </div>
       </div>
       <div class="field-row">
@@ -621,6 +626,78 @@ async function toggleTodo(id) {
   await updateTodo(id, { done }, { drawer: state.selected === id });
   if (done) toast('Taak afgerond', 'Ongedaan maken', () => updateTodo(id, { done: false }, { drawer: state.selected === id }));
 }
+
+/* ---------- Snooze ---------- */
+const shortDate = (d) => parseYmd(d).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+
+/* One-click dates for postponing a task; options equal to its current date (or each other) are left out. */
+function snoozeOptions(t) {
+  const from = t.due && t.due > today() ? parseYmd(t.due) : new Date();
+  const opts = [
+    { label: 'Vandaag', due: today() },
+    { label: 'Morgen', due: addDays(1) },
+    { label: 'Overmorgen', due: addDays(2) },
+    { label: 'Volgende maandag', due: parseDate('volgendeweek') },
+    { label: 'Een week later', due: addDays(7, from) },
+  ];
+  const seen = new Set([t.due]);
+  const out = opts.filter((o) => !seen.has(o.due) && seen.add(o.due));
+  if (t.due) out.push({ label: 'Geen datum', due: null });
+  return out;
+}
+
+async function snoozeTodo(id, due) {
+  const before = byId(id).due;
+  if (before === due) return;
+  await updateTodo(id, { due }, { drawer: state.selected === id });
+  toast(due ? `Verzet naar ${dueLabel(due).toLowerCase()}` : 'Datum verwijderd', 'Ongedaan maken',
+    () => updateTodo(id, { due: before }, { drawer: state.selected === id }));
+}
+
+function closeSnoozeMenu() {
+  document.getElementById('snoozeMenu')?.remove();
+}
+
+function openSnoozeMenu(anchor, id) {
+  const wasOpenFor = document.getElementById('snoozeMenu')?.dataset.id;
+  closeSnoozeMenu();
+  if (wasOpenFor === String(id)) return; // second click on the same button closes it
+  const t = byId(id);
+  const menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.id = 'snoozeMenu';
+  menu.dataset.id = id;
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = `<div class="menu-head">Verzetten naar</div>${snoozeOptions(t).map((o) => `
+    <button role="menuitem" data-snooze="${o.due ?? ''}"><span>${o.label}</span><span class="menu-hint">${o.due ? shortDate(o.due) : ''}</span></button>`).join('')}`;
+  document.body.append(menu);
+  const r = anchor.getBoundingClientRect();
+  const left = Math.min(Math.max(8, r.right - menu.offsetWidth), innerWidth - menu.offsetWidth - 8);
+  const top = r.bottom + 6 + menu.offsetHeight > innerHeight ? r.top - menu.offsetHeight - 6 : r.bottom + 6;
+  menu.style.left = left + 'px';
+  menu.style.top = Math.max(8, top) + 'px';
+  menu.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-snooze]');
+    if (!b) return;
+    closeSnoozeMenu();
+    snoozeTodo(id, b.dataset.snooze || null);
+  });
+  menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll('button')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    if (e.key === 'Escape') { e.stopPropagation(); closeSnoozeMenu(); anchor.focus(); }
+  });
+  menu.querySelector('button').focus();
+}
+
+// Close the snooze menu on any click outside it, and when the page scrolls or resizes.
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#snoozeMenu, [data-act="snooze"]')) closeSnoozeMenu();
+});
+addEventListener('resize', closeSnoozeMenu);
+document.addEventListener('scroll', closeSnoozeMenu, true);
 
 /* Copy a task (open, right below the original) and open the copy with its title selected for renaming. */
 async function duplicateTodo(id) {
@@ -962,6 +1039,7 @@ function bind() {
     if (act === 'toggle') return toggleTodo(id);
     if (act === 'delete') return deleteTodo(id);
     if (act === 'duplicate') return duplicateTodo(id);
+    if (act === 'snooze') return openSnoozeMenu(e.target.closest('[data-act]'), id);
     state.selected = state.selected === id ? null : id;
     renderList();
     renderDrawer();
@@ -1040,6 +1118,7 @@ function bind() {
     if (act === 'toggle') return toggleTodo(id);
     if (act === 'delete') return deleteTodo(id);
     if (act === 'duplicate') return duplicateTodo(id);
+    if (act === 'snooze') return openSnoozeMenu(e.target.closest('[data-act]'), id);
     const prio = e.target.closest('[data-prio]');
     if (prio) return updateTodo(id, { priority: Number(prio.dataset.prio) }, { drawer: true });
     const label = e.target.closest('[data-label]');
@@ -1050,7 +1129,7 @@ function bind() {
     }
     if (act === 'new-label') return newGroupFor(id, 'category');
     const due = e.target.closest('[data-due]');
-    if (due) return updateTodo(id, { due: due.dataset.due || null }, { drawer: true });
+    if (due) return snoozeTodo(id, due.dataset.due || null);
   });
   let saveTimer;
   drawer.addEventListener('input', (e) => {
@@ -1085,6 +1164,11 @@ function bind() {
     root.dataset.theme = dark ? 'light' : 'dark';
     store.set('theme', root.dataset.theme);
     renderSidebar();
+  });
+
+  $('#logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/login';
   });
 
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('nav-open'));
@@ -1135,6 +1219,9 @@ function renderChips() {
 async function load() {
   try {
     const data = await api('GET', '/api/state');
+    const auth = data.auth || {};
+    $('#logoutBtn').hidden = !auth.enabled;
+    if (auth.enabled) $('#logoutBtn').title = `Uitloggen (${auth.user})`;
     state.clients = data.clients || [];
     state.projects = data.projects;
     state.categories = data.categories || [];

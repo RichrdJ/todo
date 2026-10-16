@@ -6,26 +6,41 @@ Configuration via environment variables:
 
   PORT          port to listen on              (default 6060)
   DB_PATH       path to the SQLite database    (default data/klaar.db)
-  APP_PASSWORD  enables HTTP basic auth when set
-  APP_USER      basic auth username            (default "admin")
-  APP_VERSION   version shown in the app       (set at image build time)
+  APP_USER           login username                         (default "admin")
+  APP_PASSWORD       enables the login page when set
+  APP_PASSWORD_HASH  same, but hashed; create one with `python server.py hash-password`
+  SESSION_DAYS       how long "ingelogd blijven" lasts         (default 30)
+  COOKIE_SECURE      true / false / auto (auto: only behind an HTTPS proxy)
+  APP_VERSION        version shown in the app                  (set at image build time)
 """
 import base64
+import getpass
+import hashlib
 import hmac
 import json
 import os
 import re
+import secrets
 import sqlite3
+import sys
 import threading
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from http.cookies import SimpleCookie
+from urllib.parse import quote, urlparse
 
 PORT = int(os.environ.get("PORT", "6060"))
 DB_PATH = os.environ.get("DB_PATH", "data/klaar.db")
 APP_USER = os.environ.get("APP_USER", "admin")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+APP_PASSWORD_HASH = os.environ.get("APP_PASSWORD_HASH", "")
+AUTH_ENABLED = bool(APP_PASSWORD or APP_PASSWORD_HASH)
+SESSION_DAYS = int(os.environ.get("SESSION_DAYS", "30"))
+SHORT_SESSION = 12 * 3600  # without "ingelogd blijven"
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "auto").lower()
+COOKIE_NAME = "todo_session"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 STATIC_DIR = (Path(__file__).parent / "static").resolve()
 
@@ -54,6 +69,11 @@ CREATE TABLE IF NOT EXISTS projects (
     color      TEXT    NOT NULL DEFAULT '#7c5cff',
     position   REAL    NOT NULL DEFAULT 0,
     created_at TEXT    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    expires_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS todos (
     id           INTEGER PRIMARY KEY,
@@ -294,7 +314,7 @@ def clean_group(store, table, data, partial):
 
 
 def get_state(store, _body):
-    state = {"version": APP_VERSION}
+    state = {"version": APP_VERSION, "auth": {"enabled": AUTH_ENABLED, "user": APP_USER if AUTH_ENABLED else None}}
     for table in GROUPS:
         state[table] = store.query(f"SELECT * FROM {table} ORDER BY position, id")
     labels = {}
@@ -423,6 +443,74 @@ for _table in GROUPS:
 ROUTES = [(m, re.compile(p + r"/?$"), h) for m, p, h in ROUTES]
 
 
+# --- Authentication -----------------------------------------------------------
+
+# Files the login page needs before anyone is logged in.
+PUBLIC_FILES = {"/login", "/login.js", "/styles.css", "/favicon.svg", "/manifest.webmanifest"}
+HASH_ITERATIONS = 600_000
+
+
+def hash_password(password, iterations=HASH_ITERATIONS):
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations).hex()
+    # ':' rather than '$' so the hash can go into docker-compose/stack files unescaped.
+    return f"pbkdf2_sha256:{iterations}:{salt}:{digest}"
+
+
+def check_credentials(user, password):
+    user_ok = hmac.compare_digest(user.encode(), APP_USER.encode())
+    if APP_PASSWORD_HASH:
+        try:
+            algo, iterations, salt, digest = APP_PASSWORD_HASH.split(":")
+            assert algo == "pbkdf2_sha256"
+            candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), int(iterations)).hex()
+        except (ValueError, AssertionError):
+            print("APP_PASSWORD_HASH heeft een ongeldig formaat", flush=True)
+            return False
+        pw_ok = hmac.compare_digest(candidate.encode(), digest.encode())
+    else:
+        pw_ok = hmac.compare_digest(password.encode(), APP_PASSWORD.encode())
+    return user_ok and pw_ok
+
+
+def token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+class LoginThrottle:
+    """At most MAX_FAILURES failed logins per address per WINDOW seconds."""
+
+    MAX_FAILURES = 5
+    WINDOW = 15 * 60
+
+    def __init__(self):
+        self.failures = {}
+        self.lock = threading.Lock()
+
+    def _recent(self, addr, now):
+        return [t for t in self.failures.get(addr, []) if now - t < self.WINDOW]
+
+    def retry_after(self, addr):
+        now = time.time()
+        with self.lock:
+            recent = self.failures[addr] = self._recent(addr, now)
+            if len(recent) < self.MAX_FAILURES:
+                return 0
+            return int(self.WINDOW - (now - recent[0])) + 1
+
+    def failed(self, addr):
+        now = time.time()
+        with self.lock:
+            self.failures[addr] = self._recent(addr, now) + [now]
+
+    def succeeded(self, addr):
+        with self.lock:
+            self.failures.pop(addr, None)
+
+
+throttle = LoginThrottle()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "ToDo"
     store = None  # set in main()
@@ -444,19 +532,97 @@ class Handler(BaseHTTPRequestHandler):
         if data and self.command != "HEAD":
             self.wfile.write(data)
 
+    def session_token(self):
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except Exception:
+            return None
+        morsel = cookie.get(COOKIE_NAME)
+        return morsel.value if morsel else None
+
+    def has_session(self):
+        token = self.session_token()
+        if not token:
+            return False
+        row = self.store.one("SELECT expires_at FROM sessions WHERE token_hash=?", (token_hash(token),))
+        return bool(row and row["expires_at"] > time.time())
+
     def authorized(self):
-        if not APP_PASSWORD:
+        if not AUTH_ENABLED or self.has_session():
             return True
+        # Basic auth keeps working for scripts and other API clients (same attempt limit as the login page).
         header = self.headers.get("Authorization", "")
         if header.startswith("Basic "):
+            addr = self.client_address[0]
+            if throttle.retry_after(addr):
+                return False
             try:
                 user, _, pw = base64.b64decode(header[6:]).decode().partition(":")
             except Exception:
                 return False
-            return hmac.compare_digest(user.encode(), APP_USER.encode()) and hmac.compare_digest(
-                pw.encode(), APP_PASSWORD.encode()
-            )
+            if check_credentials(user, pw):
+                return True
+            throttle.failed(addr)
         return False
+
+    def same_origin(self):
+        """Reject cross-site writes: a browser always sends Origin on POST/PATCH/DELETE from fetch()."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        return urlparse(origin).netloc == self.headers.get("Host", "")
+
+    def cookie_header(self, token, max_age):
+        secure = COOKIE_SECURE == "true" or (
+            COOKIE_SECURE == "auto" and self.headers.get("X-Forwarded-Proto", "").lower() == "https"
+        )
+        parts = [f"{COOKIE_NAME}={token}", "Path=/", "HttpOnly", "SameSite=Lax"]
+        if max_age is not None:
+            parts.append(f"Max-Age={max_age}")
+        if secure:
+            parts.append("Secure")
+        return "; ".join(parts)
+
+    def login(self):
+        if not AUTH_ENABLED:
+            return self.send_json(200, {"ok": True})
+        addr = self.client_address[0]
+        wait = throttle.retry_after(addr)
+        if wait:
+            minutes = max(1, round(wait / 60))
+            return self.send_json(429, {"error": f"Te veel pogingen. Probeer het over {minutes} min opnieuw."},
+                                  {"Retry-After": str(wait)})
+        body = self.read_body()
+        user = str(body.get("username") or "")
+        password = str(body.get("password") or "")
+        if not check_credentials(user, password):
+            throttle.failed(addr)
+            print(f"{addr} mislukte inlogpoging voor '{user[:40]}'", flush=True)
+            return self.send_json(401, {"error": "Onjuiste gebruikersnaam of wachtwoord."})
+        throttle.succeeded(addr)
+        remember = bool(body.get("remember"))
+        lifetime = SESSION_DAYS * 86400 if remember else SHORT_SESSION
+        token = secrets.token_urlsafe(32)
+        self.store.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))
+        self.store.execute(
+            "INSERT INTO sessions (token_hash, created_at, expires_at) VALUES (?, ?, ?)",
+            (token_hash(token), now(), time.time() + lifetime),
+        )
+        # Without "ingelogd blijven" the cookie ends with the browser session (and after 12 hours at most).
+        self.send_json(200, {"ok": True}, {"Set-Cookie": self.cookie_header(token, lifetime if remember else None)})
+
+    def logout(self):
+        token = self.session_token()
+        if token:
+            self.store.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash(token),))
+        self.send_json(200, {"ok": True}, {"Set-Cookie": self.cookie_header("", 0)})
+
+    def redirect(self, location):
+        self.send_response(303)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def read_body(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -477,12 +643,26 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/health":
             return self.send_json(200, {"ok": True, "version": APP_VERSION})
-        if not self.authorized():
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="ToDo", charset="UTF-8"')
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
+        if self.command in ("POST", "PATCH", "DELETE") and not self.same_origin():
+            return self.send_json(403, {"error": "verzoek van een andere site geweigerd"})
+        try:
+            if path == "/api/login" and self.command == "POST":
+                return self.login()
+        except BadRequest as e:
+            return self.send_json(400, {"error": str(e)})
+        if path == "/api/logout" and self.command == "POST":
+            return self.logout()
+        authed = self.authorized()
+        if path == "/login":
+            # Already logged in (or no login configured): straight to the app.
+            return self.redirect("/") if authed else self.serve_static("/login.html")
+        if not authed:
+            if path.startswith("/api/"):
+                return self.send_json(401, {"error": "niet ingelogd"})
+            if path in PUBLIC_FILES:
+                return self.serve_static(path)
+            nxt = quote(self.path, safe="/")
+            return self.redirect("/login" + (f"?next={nxt}" if self.path not in ("/", "") else ""))
         if path.startswith("/api/"):
             return self.handle_api(path)
         if self.command in ("GET", "HEAD"):
@@ -526,11 +706,23 @@ class Handler(BaseHTTPRequestHandler):
     do_GET = do_HEAD = do_POST = do_PATCH = do_DELETE = handle_any
 
 
+def hash_password_cli():
+    password = getpass.getpass("Nieuw wachtwoord: ")
+    if len(password) < 8:
+        sys.exit("Kies een wachtwoord van minimaal 8 tekens.")
+    if getpass.getpass("Nogmaals: ") != password:
+        sys.exit("De wachtwoorden zijn niet gelijk.")
+    print("\nZet dit in je stack/compose-bestand:\n")
+    print(f"      APP_PASSWORD_HASH: \"{hash_password(password)}\"")
+
+
 def main():
+    if sys.argv[1:2] == ["hash-password"]:
+        return hash_password_cli()
     Handler.store = Store(DB_PATH)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    auth = "aan" if APP_PASSWORD else "uit"
-    print(f"ToDo {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, wachtwoord: {auth})", flush=True)
+    auth = f"aan (gebruiker: {APP_USER})" if AUTH_ENABLED else "uit"
+    print(f"ToDo {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, inloggen: {auth})", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

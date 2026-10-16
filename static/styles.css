@@ -72,6 +72,7 @@
 
 /* ---------- Base ---------- */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -513,6 +514,56 @@ kbd {
   .dname { display: inline; text-transform: capitalize; }
   .day-add { opacity: 1; }
 }
+
+/* ---------- Snooze menu ---------- */
+.menu {
+  position: fixed; z-index: 80; min-width: 230px; padding: 6px; border-radius: 12px;
+  background: var(--panel-solid); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg);
+  animation: in .15s ease;
+}
+.menu-head { padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); }
+.menu button {
+  width: 100%; height: 34px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  border: 0; border-radius: 8px; background: none; font-size: 13.5px; text-align: left;
+}
+.menu button:hover, .menu button:focus-visible { background: var(--accent-soft); outline: none; }
+.menu-hint { font-size: 12px; color: var(--text-3); }
+.ag-snooze {
+  flex: none; width: 18px; height: 18px; margin: -1px -3px 0 0; padding: 0; border: 0; border-radius: 5px;
+  display: grid; place-items: center; background: none; color: var(--text-3); opacity: 0;
+}
+.ag-item:hover .ag-snooze, .ag-snooze:focus-visible { opacity: 1; }
+.ag-snooze:hover { color: var(--accent); background: var(--accent-soft); }
+.ag-snooze svg { width: 13px; height: 13px; }
+@media (hover: none) { .ag-snooze { opacity: 1; } }
+
+/* ---------- Login ---------- */
+.login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
+.login-card {
+  width: min(380px, 100%); padding: 32px 28px 28px; border-radius: 20px;
+  background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+.login-card.shake { animation: shake .4s ease; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
+.login-card h1 { margin: 0; font-size: 24px; letter-spacing: -.03em; }
+.login-sub { margin: 4px 0 22px; color: var(--text-2); }
+.login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.login-field > span:first-child { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.login-field .input { height: 42px; font-size: 15px; }
+.login-field .input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.pw-wrap { position: relative; display: block; }
+.pw-wrap .input { padding-right: 42px; }
+.pw-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.remember { display: flex; align-items: center; gap: 8px; margin: 4px 0 16px; color: var(--text-2); font-size: 13.5px; cursor: pointer; }
+.remember input { width: 16px; height: 16px; accent-color: var(--accent); }
+.login-error {
+  margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px;
+  color: var(--danger); background: rgba(229, 72, 77, .1); border: 1px solid rgba(229, 72, 77, .25);
+}
+.login-btn { width: 100%; height: 42px; font-size: 15px; }
+.login-btn:disabled { opacity: .7; cursor: default; }
 
 /* ---------- Toast & modal ---------- */
 .toast {

@@ -15,12 +15,13 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
   - `!hoog` / `!middel` / `!laag` (of `!3` `!2` `!1`)
   - `#naam` voor een klant of project, `+naam` voor een categorie; meerdere `+` mag (begin van de naam is genoeg)
 - **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie-labels (slaat automatisch op)
+- **Snel verzetten** van een taak met het klokje (lijst en agenda) of de datumknoppen in het detailpaneel: vandaag, morgen, overmorgen, volgende maandag of een week later
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - **Dupliceren** van een taak (knop in de lijst of het detailpaneel, of `⌘D` / `Ctrl+D`): de kopie opent meteen met de naam geselecteerd, zodat je hem direct kunt hernoemen
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
 - Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `Esc` sluiten
 - JSON-export via de zijbalk
-- Optioneel wachtwoord (HTTP basic auth)
+- **Inlogpagina** met "ingelogd blijven", versleuteld opgeslagen wachtwoord en bescherming tegen raden (optioneel)
 
 ## Agenda
 
@@ -101,15 +102,35 @@ python3 server.py
 
 ## Configuratie
 
-| Variabele      | Standaard        | Uitleg                                          |
-| -------------- | ---------------- | ----------------------------------------------- |
-| `PORT`         | `6060`           | Poort waarop de server luistert                 |
-| `DB_PATH`      | `/data/klaar.db` | Locatie van de SQLite-database                  |
-| `APP_PASSWORD` | _(leeg)_         | Zet dit om de app met een wachtwoord te beveiligen |
-| `APP_USER`     | `admin`          | Gebruikersnaam bij wachtwoordbeveiliging        |
-| `TZ`           | —                | Tijdzone, bijv. `Europe/Amsterdam`              |
+| Variabele           | Standaard        | Uitleg                                                        |
+| ------------------- | ---------------- | ------------------------------------------------------------- |
+| `PORT`              | `6060`           | Poort waarop de server luistert                               |
+| `DB_PATH`           | `/data/klaar.db` | Locatie van de SQLite-database                                |
+| `APP_USER`          | `admin`          | Gebruikersnaam om in te loggen                                |
+| `APP_PASSWORD_HASH` | _(leeg)_         | Versleuteld wachtwoord (aanbevolen), zie hieronder            |
+| `APP_PASSWORD`      | _(leeg)_         | Wachtwoord als gewone tekst (eenvoudiger, minder veilig)      |
+| `SESSION_DAYS`      | `30`             | Hoe lang *ingelogd blijven* geldt                             |
+| `COOKIE_SECURE`     | `auto`           | `true` / `false` / `auto` (auto: alleen achter een HTTPS-proxy) |
+| `TZ`                | —                | Tijdzone, bijv. `Europe/Amsterdam`                            |
 
-Draai je ToDo buiten je eigen netwerk, zet dan een `APP_PASSWORD` én een reverse proxy met HTTPS (Caddy, Traefik, Nginx Proxy Manager) ervoor; basic auth zonder HTTPS stuurt het wachtwoord leesbaar mee.
+## Inloggen
+
+Zonder wachtwoord opent de app direct. Zet je `APP_PASSWORD_HASH` (of `APP_PASSWORD`), dan krijg je een inlogpagina.
+
+**Versleuteld wachtwoord maken:**
+
+```bash
+docker run --rm -it ghcr.io/richrdj/todo:latest python server.py hash-password
+```
+
+Dit vraagt twee keer je wachtwoord en geeft een regel als `APP_PASSWORD_HASH: "pbkdf2_sha256:600000:…"` die je zo in `stack.yml` of `docker-compose.yml` zet.
+
+- **Ingelogd blijven** houdt je `SESSION_DAYS` dagen ingelogd; zonder dat vinkje eindigt de sessie als je de browser sluit (en na uiterlijk 12 uur).
+- Na **5 foute pogingen** in 15 minuten wordt inloggen vanaf dat adres een kwartier geblokkeerd.
+- **Uitloggen** via het icoon rechtsboven in de zijbalk.
+- Scripts kunnen de API nog steeds met basic auth gebruiken (`curl -u gebruiker:wachtwoord …`).
+
+Draai je ToDo buiten je eigen netwerk, zet er dan een reverse proxy met HTTPS voor (Caddy, Traefik, Nginx Proxy Manager). De inlogcookie wordt dan automatisch alleen over HTTPS verstuurd.
 
 ## Back-up
 

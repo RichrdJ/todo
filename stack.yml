@@ -16,9 +16,11 @@ services:
       - klaar-data:/data
     environment:
       TZ: Europe/Amsterdam
-      # Zet een wachtwoord om de app af te schermen (HTTP basic auth):
+      # Inloggen aanzetten: maak een versleuteld wachtwoord met
+      #   docker run --rm -it ghcr.io/richrdj/todo:latest python server.py hash-password
+      # en zet de uitkomst hieronder.
       # APP_USER: admin
-      # APP_PASSWORD: kies-iets-sterks
+      # APP_PASSWORD_HASH: "pbkdf2_sha256:600000:..."
     deploy:
       # SQLite: altijd precies één instantie, en bij updates eerst de oude stoppen
       # zodat er nooit twee containers tegelijk in de database schrijven.

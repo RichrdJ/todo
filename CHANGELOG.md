@@ -4,6 +4,19 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-16
+
+### Toegevoegd
+- Inlogpagina in plaats van het browserpopupje, met *ingelogd blijven* (standaard 30 dagen) en een uitlogknop
+- Versleuteld wachtwoord via `APP_PASSWORD_HASH`; maak er een met `python server.py hash-password`
+- Na 5 foute inlogpogingen in 15 minuten wordt inloggen een kwartier geblokkeerd
+- Snel verzetten: klokje bij taken in de lijst en de agenda met vandaag, morgen, overmorgen, volgende maandag, een week later of geen datum, met ongedaan maken
+- Detailpaneel: dezelfde keuzes als datumknoppen
+
+### Gewijzigd
+- `APP_PASSWORD` werkt nog steeds, maar toont nu de inlogpagina. Basic auth blijft werken voor scripts
+- Schrijfacties vanaf andere websites worden geweigerd
+
 ## [1.5.0] - 2026-10-16
 
 ### Toegevoegd
@@ -95,7 +108,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/RichrdJ/todo/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RichrdJ/todo/compare/v1.4.3...v1.5.0
 [1.4.3]: https://github.com/RichrdJ/todo/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/RichrdJ/todo/compare/v1.4.1...v1.4.2
