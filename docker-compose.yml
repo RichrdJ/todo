@@ -1,0 +1,19 @@
+services:
+  klaar:
+    build: .
+    # Of gebruik de kant-en-klare image van GitHub Container Registry:
+    # image: ghcr.io/<jouw-github-gebruiker>/klaar:latest
+    container_name: klaar
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - klaar-data:/data
+    environment:
+      TZ: Europe/Amsterdam
+      # Zet een wachtwoord om de app af te schermen (HTTP basic auth):
+      # APP_USER: admin
+      # APP_PASSWORD: kies-iets-sterks
+
+volumes:
+  klaar-data:
