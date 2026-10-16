@@ -157,7 +157,11 @@ kbd {
   margin: 14px 4px 4px 10px;
   font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3);
 }
-.projects .empty-hint { color: var(--text-3); font-size: 13px; padding: 6px 10px; }
+.nav-item.sub { height: 32px; padding-left: 26px; font-size: 13.5px; }
+.nav-item.sub .dot { width: 7px; height: 7px; }
+.dot.category { border-radius: 3px; }
+.dot.client { border-radius: 4px; }
+#groups .empty-hint { color: var(--text-3); font-size: 13px; padding: 6px 10px; }
 
 .sidebar-foot {
   margin-top: auto; padding: 14px 6px 0;
@@ -305,6 +309,10 @@ kbd {
 .meta span { display: inline-flex; align-items: center; gap: 5px; }
 .meta svg { width: 13px; height: 13px; }
 .meta .dot { width: 8px; height: 8px; margin: 0; }
+.meta .cat {
+  height: 19px; padding: 0 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+  color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent);
+}
 .meta .due.today { color: var(--accent); font-weight: 600; }
 .meta .due.overdue { color: var(--danger); font-weight: 600; }
 .todo .del { opacity: 0; margin: -4px 0; }
@@ -350,6 +358,7 @@ kbd {
   min-height: 160px; padding: 12px; border-radius: 10px; resize: vertical;
   border: 1px solid var(--border-strong); background: var(--card); outline: none; line-height: 1.55;
 }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .date-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .date-row .pill { flex: none; }
 .pill {
@@ -388,6 +397,7 @@ kbd {
 .modal h3 { margin: 0 0 6px; font-size: 17px; }
 .modal p { margin: 0 0 16px; color: var(--text-2); }
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dlg-label { display: block; margin: 14px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; padding: 0; box-shadow: inset 0 0 0 2px var(--panel-solid); }
 .swatch.on { border-color: var(--text); }

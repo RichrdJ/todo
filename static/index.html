@@ -31,13 +31,29 @@
 
       <nav class="nav" id="nav"></nav>
 
-      <div class="section-head">
-        <span>Projecten</span>
-        <button class="icon-btn small" id="addProject" title="Nieuw project" aria-label="Nieuw project">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
+      <div id="groups">
+        <div class="section-head">
+          <span>Klanten</span>
+          <button class="icon-btn small" data-add="client" title="Nieuwe klant" aria-label="Nieuwe klant">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <nav class="nav" id="clients"></nav>
+        <div class="section-head">
+          <span>Projecten</span>
+          <button class="icon-btn small" data-add="project" title="Nieuw project" aria-label="Nieuw project">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <nav class="nav" id="projects"></nav>
+        <div class="section-head">
+          <span>Categorieën</span>
+          <button class="icon-btn small" data-add="category" title="Nieuwe categorie" aria-label="Nieuwe categorie">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <nav class="nav" id="categories"></nav>
       </div>
-      <nav class="nav projects" id="projects"></nav>
 
       <div class="sidebar-foot">
         <a href="/api/export" class="foot-link" title="Download al je taken als JSON">
@@ -67,7 +83,7 @@
 
       <form class="composer" id="composer" autocomplete="off">
         <span class="plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-        <input id="newTitle" placeholder="Nieuwe taak…  probeer: Offerte sturen @morgen !hoog #Sales" maxlength="500">
+        <input id="newTitle" placeholder="Nieuwe taak…  probeer: Notulen sturen @morgen !hoog #klant +overleg" maxlength="500">
         <button type="submit" class="btn primary">Toevoegen</button>
         <div class="chips" id="chips"></div>
       </form>

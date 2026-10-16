@@ -7,18 +7,32 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 ## Features
 
 - **Slimme weergaven**: Vandaag (incl. te laat), Gepland (per dag gegroepeerd), Alle taken, Belangrijk, Voltooid
-- **Projecten** met eigen kleur; sleep een taak naar een project in de zijbalk om hem te verplaatsen
+- **Klanten, projecten en categorieën** om je werk te scheiden (zie hieronder)
 - **Snel invoeren** in één regel:
-  `Offerte sturen @morgen !hoog #klant`
+  `Notulen sturen #gemeente +overleg @morgen !hoog`
   - `@vandaag`, `@morgen`, `@overmorgen`, `@vrijdag` / `@vr`, `@volgendeweek`, `@20-10`, `@2026-10-20`
   - `!hoog` / `!middel` / `!laag` (of `!3` `!2` `!1`)
-  - `#project` (begin van de projectnaam is genoeg)
-- **Detailpaneel** met notities, deadline, prioriteit en project (slaat automatisch op)
+  - `#naam` voor een klant of project, `+naam` voor een categorie (begin van de naam is genoeg)
+- **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie (slaat automatisch op)
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
 - Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `1`–`5` wissel weergave, `Esc` sluiten
 - JSON-export via de zijbalk
 - Optioneel wachtwoord (HTTP basic auth)
+
+## Klanten, projecten en categorieën
+
+| Wat           | Betekenis                        | Voorbeeld                         |
+| ------------- | -------------------------------- | --------------------------------- |
+| **Klant**     | Voor wie je het werk doet        | Gemeente Utrecht, Provincie       |
+| **Project**   | Een klus, optioneel onder een klant | Koppeling Suite4, Sprint 42    |
+| **Categorie** | Wat voor soort werk het is       | Overleg, Ontwikkeling, Support    |
+
+- Een taak heeft hooguit één klant, één project en één categorie.
+- Kies je een project dat bij een klant hoort, dan krijgt de taak automatisch die klant. Kies je een andere klant, dan vervalt het project van de oude klant.
+- Projecten zonder klant (bijv. intern werk) staan in de zijbalk onder *Projecten*; projecten van een klant staan onder die klant.
+- De klantweergave groepeert taken per project. Een categorie loopt dwars door alle klanten heen, zodat je bijvoorbeeld al je overleggen bij elkaar ziet.
+- Sleep een taak naar een klant, project of categorie in de zijbalk om hem daar onder te brengen.
 
 ## Starten
 
@@ -96,7 +110,7 @@ Of download een JSON-export via **Export** onderin de zijbalk.
 
 | Methode  | Pad                     | Doel                              |
 | -------- | ----------------------- | --------------------------------- |
-| `GET`    | `/api/state`            | Alle projecten en taken           |
+| `GET`    | `/api/state`            | Alle klanten, projecten, categorieën en taken |
 | `POST`   | `/api/todos`            | Taak aanmaken                     |
 | `PATCH`  | `/api/todos/:id`        | Taak wijzigen                     |
 | `DELETE` | `/api/todos/:id`        | Taak verwijderen                  |
@@ -104,6 +118,8 @@ Of download een JSON-export via **Export** onderin de zijbalk.
 | `POST`   | `/api/projects`         | Project aanmaken                  |
 | `PATCH`  | `/api/projects/:id`     | Project wijzigen                  |
 | `DELETE` | `/api/projects/:id`     | Project verwijderen               |
+| `POST` `PATCH` `DELETE` | `/api/clients[/:id]` | Klanten, net als projecten |
+| `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | Categorieën, net als projecten |
 | `GET`    | `/api/export`           | JSON-export                       |
 | `GET`    | `/api/health`           | Healthcheck (zonder auth)         |
 

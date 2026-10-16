@@ -57,6 +57,8 @@ const ICONS = {
   chev: '<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   coffee: '<svg viewBox="0 0 24 24"><path d="M4 9h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
   folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
 };
 
@@ -70,7 +72,9 @@ const COLORS = ['#7c5cff', '#3b82f6', '#06b6d4', '#22c55e', '#a3e635', '#f59e0b'
 
 /* ---------- State ---------- */
 const state = {
+  clients: [],
   projects: [],
+  categories: [],
   todos: [],
   view: store.get('view') || 'today',
   search: '',
@@ -79,6 +83,17 @@ const state = {
 };
 const byId = (id) => state.todos.find((t) => t.id === id);
 const projectById = (id) => state.projects.find((p) => p.id === id);
+const clientById = (id) => state.clients.find((c) => c.id === id);
+const categoryById = (id) => state.categories.find((c) => c.id === id);
+
+// The ways a todo can be grouped. A client is who the work is for (projects
+// can belong to one), a category is what kind of work it is.
+const KINDS = {
+  client: { list: 'clients', field: 'client_id', title: 'Klant', noun: 'klant', create: 'Nieuwe klant', placeholder: 'Bijv. Gemeente Utrecht' },
+  project: { list: 'projects', field: 'project_id', title: 'Project', noun: 'project', create: 'Nieuw project', placeholder: 'Bijv. Migratie Suite4, Sprint 42' },
+  category: { list: 'categories', field: 'category_id', title: 'Categorie', noun: 'categorie', create: 'Nieuwe categorie', placeholder: 'Bijv. Overleg, Support, Ontwikkeling' },
+};
+const groupById = (kind, id) => state[KINDS[kind].list].find((g) => g.id === id);
 
 const VIEWS = {
   today: { title: 'Vandaag', icon: ICONS.sun, key: '1', filter: (t) => !t.done && t.due && t.due <= today() },
@@ -88,8 +103,11 @@ const VIEWS = {
   done: { title: 'Voltooid', icon: ICONS.checkCircle, key: '5', filter: (t) => t.done },
 };
 
-function currentProject() {
-  return state.view.startsWith('project:') ? projectById(Number(state.view.slice(8))) : null;
+/* The client, project or category whose view is open, if any. */
+function currentScope() {
+  const m = state.view.match(/^(client|project|category):(\d+)$/);
+  const item = m && groupById(m[1], Number(m[2]));
+  return item ? { kind: m[1], item } : null;
 }
 
 /* ---------- Quick-add parsing ---------- */
@@ -122,8 +140,12 @@ function parseDate(word) {
   return null;
 }
 
+const norm = (s) => s.toLowerCase().replace(/\s+/g, '');
+const exact = (list, q) => list.find((x) => norm(x.name) === q);
+const prefix = (list, q) => list.find((x) => norm(x.name).startsWith(q));
+
 function parseQuick(text) {
-  const out = { title: text, priority: null, due: null, project: null };
+  const out = { title: text, priority: null, due: null, project: null, client: null, category: null };
   const words = [];
   for (const word of text.split(/\s+/)) {
     let m;
@@ -134,10 +156,19 @@ function parseQuick(text) {
     } else if ((m = word.match(/^@(.+)$/)) && parseDate(m[1])) {
       out.due = parseDate(m[1]);
     } else if ((m = word.match(/^#(.+)$/))) {
+      // #naam: a project or a client; exact names win over prefixes.
       const q = m[1].toLowerCase();
-      const p = state.projects.find((p) => p.name.toLowerCase().replace(/\s+/g, '') === q)
-        || state.projects.find((p) => p.name.toLowerCase().replace(/\s+/g, '').startsWith(q));
-      if (p) out.project = p; else words.push(word);
+      const p = exact(state.projects, q);
+      const c = !p && exact(state.clients, q);
+      const pp = !p && !c && prefix(state.projects, q);
+      const cc = !p && !c && !pp && prefix(state.clients, q);
+      if (p || pp) out.project = p || pp;
+      else if (c || cc) out.client = c || cc;
+      else words.push(word);
+    } else if ((m = word.match(/^\+(.+)$/))) {
+      const q = m[1].toLowerCase();
+      const cat = exact(state.categories, q) || prefix(state.categories, q);
+      if (cat) out.category = cat; else words.push(word);
     } else {
       words.push(word);
     }
@@ -151,7 +182,9 @@ function counts() {
   const open = state.todos.filter((t) => !t.done);
   const c = {};
   for (const [k, v] of Object.entries(VIEWS)) c[k] = state.todos.filter(v.filter).length;
-  for (const p of state.projects) c['project:' + p.id] = open.filter((t) => t.project_id === p.id).length;
+  for (const [kind, k] of Object.entries(KINDS)) {
+    for (const g of state[k.list]) c[kind + ':' + g.id] = open.filter((t) => t[k.field] === g.id).length;
+  }
   return c;
 }
 
@@ -163,16 +196,24 @@ function renderSidebar() {
       <span class="count">${k === 'done' ? '' : c[k] || ''}</span>
     </button>`).join('');
 
-  $('#projects').innerHTML = state.projects.length ? state.projects.map((p) => `
-    <div class="nav-item ${state.view === 'project:' + p.id && !state.search ? 'active' : ''}" data-view="project:${p.id}" data-project="${p.id}" role="button" tabindex="0">
-      <span class="dot" style="background:${p.color}"></span>
-      <span class="label">${esc(p.name)}</span>
-      <span class="count">${c['project:' + p.id] || ''}</span>
+  const row = (kind, g, cls = '') => `
+    <div class="nav-item ${cls} ${state.view === kind + ':' + g.id && !state.search ? 'active' : ''}" data-view="${kind}:${g.id}" data-kind="${kind}" data-id="${g.id}" role="button" tabindex="0">
+      <span class="dot ${kind}" style="background:${g.color}"></span>
+      <span class="label">${esc(g.name)}</span>
+      <span class="count">${c[kind + ':' + g.id] || ''}</span>
       <span class="proj-actions">
-        <button class="icon-btn small" data-act="edit-project" title="Bewerken">${ICONS.edit}</button>
-        <button class="icon-btn small danger" data-act="delete-project" title="Verwijderen">${ICONS.trash}</button>
+        <button class="icon-btn small" data-act="edit" title="Bewerken">${ICONS.edit}</button>
+        <button class="icon-btn small danger" data-act="delete" title="Verwijderen">${ICONS.trash}</button>
       </span>
-    </div>`).join('') : '<div class="empty-hint">Nog geen projecten</div>';
+    </div>`;
+  const hint = (text) => `<div class="empty-hint">${text}</div>`;
+  $('#clients').innerHTML = state.clients.map((cl) => row('client', cl)
+    + state.projects.filter((p) => p.client_id === cl.id).map((p) => row('project', p, 'sub')).join('')).join('')
+    || hint('Nog geen klanten');
+  $('#projects').innerHTML = state.projects.filter((p) => !p.client_id).map((p) => row('project', p)).join('')
+    || hint('Projecten zonder klant, bijv. intern');
+  $('#categories').innerHTML = state.categories.map((g) => row('category', g)).join('')
+    || hint('Bijv. Overleg, Support');
 
   const dark = document.documentElement.dataset.theme === 'dark'
     || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -186,19 +227,29 @@ function viewGroups() {
 
   if (state.search) {
     const q = state.search.toLowerCase();
-    const hits = state.todos.filter((t) => t.title.toLowerCase().includes(q) || t.notes.toLowerCase().includes(q));
+    const names = (t) => [clientById(t.client_id), projectById(t.project_id), categoryById(t.category_id)]
+      .filter(Boolean).map((g) => g.name.toLowerCase()).join(' ');
+    const hits = state.todos.filter((t) => t.title.toLowerCase().includes(q) || t.notes.toLowerCase().includes(q) || names(t).includes(q));
     return [
       { key: 's-open', items: hits.filter((t) => !t.done).sort(posSort) },
       { key: 's-done', label: 'Voltooid', items: hits.filter((t) => t.done).sort(doneSort), collapsible: true },
     ];
   }
 
-  const project = currentProject();
-  if (project) {
-    const mine = state.todos.filter((t) => t.project_id === project.id);
+  const scope = currentScope();
+  if (scope) {
+    const { kind, item } = scope;
+    const mine = state.todos.filter((t) => t[KINDS[kind].field] === item.id);
+    const open = mine.filter((t) => !t.done).sort(posSort);
+    const done = { key: kind + '-done', label: 'Voltooid', items: mine.filter((t) => t.done).sort(doneSort), collapsible: true };
+    if (kind !== 'client') return [{ key: kind + '-open', items: open, sortable: true }, done];
+    // A client's tasks, grouped by its projects.
+    const projects = state.projects.filter((p) => p.client_id === item.id);
+    const inProject = new Set(projects.map((p) => p.id));
     return [
-      { key: 'p-open', items: mine.filter((t) => !t.done).sort(posSort), sortable: true },
-      { key: 'p-done', label: 'Voltooid', items: mine.filter((t) => t.done).sort(doneSort), collapsible: true },
+      { key: 'c-general', label: projects.length ? 'Algemeen' : '', items: open.filter((t) => !inProject.has(t.project_id)), sortable: true },
+      ...projects.map((p) => ({ key: 'c-p' + p.id, label: p.name, items: open.filter((t) => t.project_id === p.id), sortable: true })),
+      done,
     ];
   }
 
@@ -235,9 +286,16 @@ function viewGroups() {
 }
 
 function renderTodo(t, sortable) {
+  const scope = currentScope();
+  const cl = t.client_id ? clientById(t.client_id) : null;
   const p = t.project_id ? projectById(t.project_id) : null;
+  const cat = t.category_id ? categoryById(t.category_id) : null;
   const meta = [];
-  if (p && !currentProject()) meta.push(`<span><i class="dot" style="background:${p.color}"></i>${esc(p.name)}</span>`);
+  // Client and project are implied by a client or project view (and its group headers).
+  if ((cl || p) && (!scope || scope.kind === 'category')) {
+    meta.push(`<span><i class="dot" style="background:${(cl || p).color}"></i>${[cl, p].filter(Boolean).map((g) => esc(g.name)).join(' › ')}</span>`);
+  }
+  if (cat && scope?.kind !== 'category') meta.push(`<span class="cat" style="--c:${cat.color}">${esc(cat.name)}</span>`);
   if (t.due) {
     const d = dayDiff(t.due);
     const cls = t.done ? '' : d < 0 ? 'overdue' : d === 0 ? 'today' : '';
@@ -287,8 +345,8 @@ function renderList() {
 }
 
 function renderHeader() {
-  const project = currentProject();
-  const title = state.search ? 'Zoekresultaten' : project ? project.name : VIEWS[state.view].title;
+  const scope = currentScope();
+  const title = state.search ? 'Zoekresultaten' : scope ? scope.item.name : VIEWS[state.view].title;
   $('#viewTitle').textContent = title;
   document.title = `${title} · Klaar`;
 
@@ -310,10 +368,13 @@ function renderHeader() {
   } else {
     const n = state.search ? null : viewGroups().filter((g) => !g.collapsible).reduce((s, g) => s + g.items.length, 0);
     if (n !== null) sub = state.view === 'done' ? `${n} afgerond` : `${n} open ${n === 1 ? 'taak' : 'taken'}`;
+    if (scope) sub = `${KINDS[scope.kind].title} · ${sub}`;
   }
   $('#viewSub').textContent = sub.replace(/^./, (c) => c.toUpperCase());
 
-  const ph = project ? `Nieuwe taak in ${project.name}…` : 'Nieuwe taak…  probeer: Offerte sturen @morgen !hoog #project';
+  const ph = scope
+    ? `Nieuwe taak ${scope.kind === 'client' ? 'voor' : 'in'} ${scope.item.name}…`
+    : 'Nieuwe taak…  probeer: Notulen sturen @morgen !hoog #klant +overleg';
   $('#newTitle').placeholder = ph;
 }
 
@@ -357,11 +418,27 @@ function renderDrawer() {
           ${t.due ? '<button class="pill" data-due="">Geen datum</button>' : ''}
         </div>
       </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="dClient">Klant</label>
+          <select id="dClient">
+            <option value="">Geen klant</option>
+            ${options(state.clients, t.client_id)}
+          </select>
+        </div>
+        <div class="field">
+          <label for="dCategory">Categorie</label>
+          <select id="dCategory">
+            <option value="">Geen categorie</option>
+            ${options(state.categories, t.category_id)}
+          </select>
+        </div>
+      </div>
       <div class="field">
         <label for="dProject">Project</label>
         <select id="dProject">
           <option value="">Geen project</option>
-          ${state.projects.map((p) => `<option value="${p.id}" ${t.project_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+          ${projectOptions(t)}
         </select>
       </div>
       <div class="field">
@@ -371,6 +448,20 @@ function renderDrawer() {
       <div class="stamp">Aangemaakt ${created}${completed ? ` · Afgerond ${completed}` : ''}</div>
     </div>`;
   autosize($('#dTitle'));
+}
+
+function options(list, selected) {
+  return list.map((g) => `<option value="${g.id}" ${g.id === selected ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+}
+
+/* Projects of the todo's client first (or all, grouped by client), then those without a client. */
+function projectOptions(t) {
+  const groups = t.client_id
+    ? [[clientById(t.client_id)?.name || '', state.projects.filter((p) => p.client_id === t.client_id)]]
+    : state.clients.map((c) => [c.name, state.projects.filter((p) => p.client_id === c.id)]);
+  groups.push(['Zonder klant', state.projects.filter((p) => !p.client_id)]);
+  return groups.filter(([, list]) => list.length)
+    .map(([name, list]) => `<optgroup label="${esc(name)}">${options(list, t.project_id)}</optgroup>`).join('');
 }
 
 function autosize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
@@ -432,8 +523,8 @@ async function deleteTodo(id) {
   try {
     await api('DELETE', `/api/todos/${id}`);
     toast('Taak verwijderd', 'Ongedaan maken', async () => {
-      const { title, notes, priority, due, project_id, position, done } = t;
-      replaceTodo(await api('POST', '/api/todos', { title, notes, priority, due, project_id, position, done }));
+      const { title, notes, priority, due, client_id, project_id, category_id, position, done } = t;
+      replaceTodo(await api('POST', '/api/todos', { title, notes, priority, due, client_id, project_id, category_id, position, done }));
       render();
     });
   } catch (e) { toast('Verwijderen mislukt: ' + e.message); load(); }
@@ -442,18 +533,23 @@ async function deleteTodo(id) {
 async function addTodo(text) {
   const q = parseQuick(text);
   if (!q.title) return;
-  const project = q.project || currentProject();
+  const scope = currentScope();
   const body = { title: q.title, priority: q.priority ?? (state.view === 'important' && !state.search ? 3 : 0) };
   if (q.due) body.due = q.due;
   else if (state.view === 'today' && !state.search) body.due = today();
   else if (state.view === 'upcoming' && !state.search) body.due = addDays(1);
-  if (project) body.project_id = project.id;
+  if (q.project) body.project_id = q.project.id;
+  else if (q.client) body.client_id = q.client.id;
+  else if (scope?.kind === 'project') body.project_id = scope.item.id;
+  else if (scope?.kind === 'client') body.client_id = scope.item.id;
+  if (q.category) body.category_id = q.category.id;
+  else if (scope?.kind === 'category') body.category_id = scope.item.id;
   try {
     replaceTodo(await api('POST', '/api/todos', body));
     refresh();
     if (!VIEWS[state.view] || state.search) return;
     const t = state.todos[state.todos.length - 1];
-    if (!VIEWS[state.view].filter(t) && !currentProject()) toast(`Toegevoegd aan ${t.due ? dueLabel(t.due) : 'Alle taken'}`);
+    if (!VIEWS[state.view].filter(t)) toast(`Toegevoegd aan ${t.due ? dueLabel(t.due) : 'Alle taken'}`);
   } catch (e) { toast('Toevoegen mislukt: ' + e.message); }
 }
 
@@ -475,19 +571,28 @@ function setView(view) {
   render();
 }
 
-/* ---------- Projects ---------- */
-function projectDialog(project) {
+/* ---------- Clients, projects & categories ---------- */
+function groupDialog(kind, item) {
+  const K = KINDS[kind];
   return new Promise((resolve) => {
-    let color = project ? project.color : COLORS[state.projects.length % COLORS.length];
+    let color = item ? item.color : COLORS[state[K.list].length % COLORS.length];
+    const scope = currentScope();
+    const clientId = item ? item.client_id : scope?.kind === 'client' ? scope.item.id : null;
     const modal = $('#modal');
     modal.innerHTML = `
       <form class="box">
-        <h3>${project ? 'Project bewerken' : 'Nieuw project'}</h3>
-        <input class="input" name="name" placeholder="Bijv. Klant X, Sprint 42, Overleg" value="${project ? esc(project.name) : ''}" maxlength="80" required>
+        <h3>${item ? `${K.title} bewerken` : K.create}</h3>
+        <input class="input" name="name" placeholder="${K.placeholder}" value="${item ? esc(item.name) : ''}" maxlength="80" required>
+        ${kind === 'project' ? `
+          <label class="dlg-label" for="dlgClient">Klant</label>
+          <select class="input" id="dlgClient" name="client">
+            <option value="">Geen klant (intern)</option>
+            ${options(state.clients, clientId)}
+          </select>` : ''}
         <div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch ${c === color ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Kleur ${c}"></button>`).join('')}</div>
         <div class="actions">
           <button type="button" class="btn ghost" data-act="cancel">Annuleren</button>
-          <button type="submit" class="btn primary">${project ? 'Opslaan' : 'Aanmaken'}</button>
+          <button type="submit" class="btn primary">${item ? 'Opslaan' : 'Aanmaken'}</button>
         </div>
       </form>`;
     modal.hidden = false;
@@ -506,7 +611,10 @@ function projectDialog(project) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const name = form.name.value.trim();
-      if (name) close({ name, color });
+      if (!name) return;
+      const res = { name, color };
+      if (kind === 'project') res.client_id = form.client.value ? Number(form.client.value) : null;
+      close(res);
     });
     modal.onclick = (e) => { if (e.target === modal) close(null); };
     modal.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
@@ -535,38 +643,38 @@ function confirmDialog(title, text, okLabel = 'Verwijderen') {
   });
 }
 
-async function addProject() {
-  const res = await projectDialog(null);
+async function addGroup(kind) {
+  const res = await groupDialog(kind, null);
   if (!res) return;
   try {
-    const p = await api('POST', '/api/projects', res);
-    state.projects.push(p);
-    setView('project:' + p.id);
-  } catch (e) { toast('Project aanmaken mislukt: ' + e.message); }
+    const g = await api('POST', `/api/${KINDS[kind].list}`, res);
+    state[KINDS[kind].list].push(g);
+    setView(kind + ':' + g.id);
+  } catch (e) { toast('Aanmaken mislukt: ' + e.message); }
 }
 
-async function editProject(id) {
-  const p = projectById(id);
-  const res = await projectDialog(p);
+async function editGroup(kind, id) {
+  const res = await groupDialog(kind, groupById(kind, id));
   if (!res) return;
   try {
-    Object.assign(p, await api('PATCH', `/api/projects/${id}`, res));
-    render();
+    await api('PATCH', `/api/${KINDS[kind].list}/${id}`, res);
+    await load(); // moving a project to another client also moves its tasks
   } catch (e) { toast('Opslaan mislukt: ' + e.message); }
 }
 
-async function deleteProject(id) {
-  const p = projectById(id);
-  const n = state.todos.filter((t) => t.project_id === id).length;
-  const ok = await confirmDialog(`“${p.name}” verwijderen?`, n
-    ? `De ${n} ${n === 1 ? 'taak blijft' : 'taken blijven'} bewaard, maar zonder project.`
-    : 'Dit project heeft geen taken.');
+async function deleteGroup(kind, id) {
+  const K = KINDS[kind];
+  const g = groupById(kind, id);
+  const n = state.todos.filter((t) => t[K.field] === id).length;
+  const extra = kind === 'client' && state.projects.some((p) => p.client_id === id) ? ' Projecten van deze klant blijven ook bestaan.' : '';
+  const ok = await confirmDialog(`“${g.name}” verwijderen?`, (n
+    ? `De ${n} ${n === 1 ? 'taak blijft' : 'taken blijven'} bewaard, maar zonder ${K.noun}.`
+    : `Deze ${K.noun} heeft geen taken.`) + extra);
   if (!ok) return;
   try {
-    await api('DELETE', `/api/projects/${id}`);
-    state.projects = state.projects.filter((x) => x.id !== id);
-    state.todos.forEach((t) => { if (t.project_id === id) t.project_id = null; });
-    if (state.view === 'project:' + id) setView('all'); else render();
+    await api('DELETE', `/api/${K.list}/${id}`);
+    if (state.view === kind + ':' + id) state.view = 'all';
+    await load();
   } catch (e) { toast('Verwijderen mislukt: ' + e.message); }
 }
 
@@ -589,24 +697,27 @@ function bind() {
     if (item) setView(item.dataset.view);
   });
 
-  $('#projects').addEventListener('click', (e) => {
-    const item = e.target.closest('[data-project]');
+  const groupsEl = $('#groups');
+  groupsEl.addEventListener('click', (e) => {
+    const add = e.target.closest('[data-add]');
+    if (add) return addGroup(add.dataset.add);
+    const item = e.target.closest('[data-kind]');
     if (!item) return;
-    const id = Number(item.dataset.project);
+    const { kind } = item.dataset;
+    const id = Number(item.dataset.id);
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'edit-project') return editProject(id);
-    if (act === 'delete-project') return deleteProject(id);
-    setView('project:' + id);
+    if (act === 'edit') return editGroup(kind, id);
+    if (act === 'delete') return deleteGroup(kind, id);
+    setView(kind + ':' + id);
   });
-  $('#projects').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.dataset.project) setView('project:' + e.target.dataset.project);
+  groupsEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.dataset.kind) setView(e.target.dataset.view);
   });
-  $('#addProject').addEventListener('click', addProject);
 
-  // Drop a todo on a project (or "Vandaag") in the sidebar to move it there.
+  // Drop a todo on a client, project, category or "Vandaag" in the sidebar.
   const sidebar = $('#sidebar');
   sidebar.addEventListener('dragover', (e) => {
-    const target = e.target.closest('[data-project], [data-view="today"], [data-view="all"]');
+    const target = e.target.closest('[data-kind], [data-view="today"]');
     if (!target || !dragId) return;
     e.preventDefault();
     sidebar.querySelectorAll('.drop-target').forEach((x) => x !== target && x.classList.remove('drop-target'));
@@ -614,13 +725,12 @@ function bind() {
   });
   sidebar.addEventListener('dragleave', (e) => e.target.closest?.('.drop-target')?.classList.remove('drop-target'));
   sidebar.addEventListener('drop', (e) => {
-    const target = e.target.closest('[data-project], [data-view="today"], [data-view="all"]');
+    const target = e.target.closest('[data-kind], [data-view="today"]');
     sidebar.querySelectorAll('.drop-target').forEach((x) => x.classList.remove('drop-target'));
     if (!target || !dragId) return;
     e.preventDefault();
-    if (target.dataset.project) updateTodo(dragId, { project_id: Number(target.dataset.project) });
-    else if (target.dataset.view === 'today') updateTodo(dragId, { due: today() });
-    else updateTodo(dragId, { project_id: null });
+    if (target.dataset.kind) updateTodo(dragId, { [KINDS[target.dataset.kind].field]: Number(target.dataset.id) });
+    else updateTodo(dragId, { due: today() });
   });
 
   $('#search').addEventListener('input', (e) => {
@@ -729,7 +839,8 @@ function bind() {
   drawer.addEventListener('change', (e) => {
     const id = state.selected;
     if (e.target.id === 'dDue') updateTodo(id, { due: e.target.value || null }, { drawer: true });
-    if (e.target.id === 'dProject') updateTodo(id, { project_id: e.target.value ? Number(e.target.value) : null }, { drawer: true });
+    const ref = { dClient: 'client_id', dProject: 'project_id', dCategory: 'category_id' }[e.target.id];
+    if (ref) updateTodo(id, { [ref]: e.target.value ? Number(e.target.value) : null }, { drawer: true });
   });
 
   $('#themeToggle').addEventListener('click', () => {
@@ -775,6 +886,8 @@ function renderChips() {
   const chips = [];
   if (q.due) chips.push(`<span class="chip">${ICONS.calendar}${dueLabel(q.due)}</span>`);
   if (q.priority) chips.push(`<span class="chip" style="color:${PRIOS[q.priority].color};background:color-mix(in srgb, ${PRIOS[q.priority].color} 14%, transparent)">${ICONS.flag}${PRIOS[q.priority].label}</span>`);
+  if (q.client) chips.push(`<span class="chip" style="color:${q.client.color};background:color-mix(in srgb, ${q.client.color} 14%, transparent)">${ICONS.briefcase}${esc(q.client.name)}</span>`);
+  if (q.category) chips.push(`<span class="chip" style="color:${q.category.color};background:color-mix(in srgb, ${q.category.color} 14%, transparent)">${ICONS.tag}${esc(q.category.name)}</span>`);
   if (q.project) chips.push(`<span class="chip" style="color:${q.project.color};background:color-mix(in srgb, ${q.project.color} 14%, transparent)">${ICONS.folder}${esc(q.project.name)}</span>`);
   const el = $('#chips');
   el.innerHTML = chips.join('');
@@ -785,11 +898,13 @@ function renderChips() {
 async function load() {
   try {
     const data = await api('GET', '/api/state');
+    state.clients = data.clients || [];
     state.projects = data.projects;
+    state.categories = data.categories || [];
     const v = data.version || 'dev';
     $('#version').textContent = /^\d/.test(v) ? 'v' + v : v;
     state.todos = data.todos;
-    if (state.view.startsWith('project:') && !currentProject()) state.view = 'today';
+    if (/^(client|project|category):/.test(state.view) && !currentScope()) state.view = 'today';
     if (state.selected && !byId(state.selected)) state.selected = null;
     const editing = $('#drawer').contains(document.activeElement);
     editing ? refresh() : render();
