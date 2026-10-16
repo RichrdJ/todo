@@ -22,7 +22,31 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 
 ## Starten
 
-### Docker Compose (aanbevolen)
+Images staan op GitHub Container Registry als `ghcr.io/richrdj/todo` (amd64 + arm64, dus ook voor een Raspberry Pi of Synology).
+
+| Tag                 | Wat                                                  |
+| ------------------- | ---------------------------------------------------- |
+| `latest`            | Laatste release                                      |
+| `1.2.3` `1.2` `1`   | Vaste release (`1` volgt automatisch 1.x-updates)    |
+| `edge`              | Laatste commit op `main`, ongetest                   |
+
+### Docker stack (Swarm / Portainer)
+
+```bash
+docker stack deploy -c stack.yml klaar
+```
+
+Een vaste versie kiezen:
+
+```bash
+KLAAR_VERSION=1.0.0 docker stack deploy -c stack.yml klaar
+```
+
+Bij elke [release](https://github.com/RichrdJ/todo/releases) staat ook een `klaar-stack.yml` met de versie al ingevuld. In Portainer: *Stacks → Add stack → Web editor* en plak de inhoud van `stack.yml`.
+
+De stack draait bewust precies één container: SQLite verdraagt geen twee schrijvers tegelijk. Updates stoppen daarom eerst de oude container voordat de nieuwe start.
+
+### Docker Compose
 
 ```bash
 git clone https://github.com/RichrdJ/todo.git
@@ -30,24 +54,13 @@ cd todo
 docker compose up -d
 ```
 
-Open daarna <http://localhost:8080>.
+Open daarna <http://localhost:8080>. Dit bouwt de image lokaal; wil je de kant-en-klare image, vervang dan in `docker-compose.yml` de regel `build: .` door `image: ghcr.io/richrdj/todo:latest`.
 
 ### Alleen Docker
 
 ```bash
-docker build -t klaar .
-docker run -d --name klaar -p 8080:8080 -v klaar-data:/data --restart unless-stopped klaar
+docker run -d --name klaar -p 8080:8080 -v klaar-data:/data --restart unless-stopped ghcr.io/richrdj/todo:latest
 ```
-
-### Kant-en-klare image
-
-Bij elke push naar `main` bouwt GitHub Actions een multi-arch image (amd64 + arm64, dus ook voor een Raspberry Pi of Synology):
-
-```bash
-docker run -d --name klaar -p 8080:8080 -v klaar-data:/data ghcr.io/richrdj/todo:latest
-```
-
-> Is de repo privé, dan is de package dat ook. Log dan eerst in met `docker login ghcr.io`, of zet de package op public in GitHub onder *Packages → Package settings*.
 
 ### Zonder Docker
 
@@ -93,6 +106,20 @@ Of download een JSON-export via **Export** onderin de zijbalk.
 | `DELETE` | `/api/projects/:id`     | Project verwijderen               |
 | `GET`    | `/api/export`           | JSON-export                       |
 | `GET`    | `/api/health`           | Healthcheck (zonder auth)         |
+
+## Releases
+
+Versies volgen [SemVer](https://semver.org). Een nieuwe release maken:
+
+1. Werk [CHANGELOG.md](CHANGELOG.md) bij en commit.
+2. Tag en push:
+
+   ```bash
+   git tag v1.1.0
+   git push origin v1.1.0
+   ```
+
+GitHub Actions bouwt dan de image (`1.1.0`, `1.1`, `1` en `latest`) en maakt een GitHub Release met automatische release notes en een `klaar-stack.yml`. De versie staat ook rechtsonder in de app en in `/api/health`.
 
 ## Techniek
 

@@ -169,6 +169,8 @@ kbd {
 .foot-link:hover { color: var(--accent); }
 .foot-link svg { width: 15px; height: 15px; }
 .shortcuts kbd { padding: 2px 4px; }
+.version { color: var(--text-3); text-decoration: none; font-variant-numeric: tabular-nums; }
+.version:hover { color: var(--accent); }
 
 /* ---------- Buttons ---------- */
 .icon-btn {

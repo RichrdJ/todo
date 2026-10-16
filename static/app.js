@@ -786,6 +786,8 @@ async function load() {
   try {
     const data = await api('GET', '/api/state');
     state.projects = data.projects;
+    const v = data.version || 'dev';
+    $('#version').textContent = /^\d/.test(v) ? 'v' + v : v;
     state.todos = data.todos;
     if (state.view.startsWith('project:') && !currentProject()) state.view = 'today';
     if (state.selected && !byId(state.selected)) state.selected = null;

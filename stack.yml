@@ -1,0 +1,43 @@
+# Docker Swarm / Portainer stack
+#
+#   docker stack deploy -c stack.yml klaar
+#
+# Kies een versie met KLAAR_VERSION (bijv. KLAAR_VERSION=1.0.0), standaard "latest".
+# Bij elke GitHub Release hoort ook een klaar-stack.yml met de versie al ingevuld.
+
+version: "3.8"
+
+services:
+  klaar:
+    image: ghcr.io/richrdj/todo:${KLAAR_VERSION:-latest}
+    ports:
+      - "8080:8080"
+    volumes:
+      - klaar-data:/data
+    environment:
+      TZ: Europe/Amsterdam
+      # Zet een wachtwoord om de app af te schermen (HTTP basic auth):
+      # APP_USER: admin
+      # APP_PASSWORD: kies-iets-sterks
+    deploy:
+      # SQLite: altijd precies één instantie, en bij updates eerst de oude stoppen
+      # zodat er nooit twee containers tegelijk in de database schrijven.
+      replicas: 1
+      update_config:
+        order: stop-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+      placement:
+        # Het volume is lokaal; houd de container op dezelfde node.
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  klaar-data:

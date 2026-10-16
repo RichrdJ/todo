@@ -1,8 +1,11 @@
 FROM python:3.13-alpine
 
+ARG VERSION=dev
+
 ENV PYTHONUNBUFFERED=1 \
     PORT=8080 \
-    DB_PATH=/data/klaar.db
+    DB_PATH=/data/klaar.db \
+    APP_VERSION=${VERSION}
 
 WORKDIR /app
 RUN adduser -D -u 1000 klaar && mkdir -p /data && chown klaar:klaar /data

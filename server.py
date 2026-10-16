@@ -8,6 +8,7 @@ Configuration via environment variables:
   DB_PATH       path to the SQLite database    (default data/klaar.db)
   APP_PASSWORD  enables HTTP basic auth when set
   APP_USER      basic auth username            (default "admin")
+  APP_VERSION   version shown in the app       (set at image build time)
 """
 import base64
 import hmac
@@ -25,6 +26,7 @@ PORT = int(os.environ.get("PORT", "8080"))
 DB_PATH = os.environ.get("DB_PATH", "data/klaar.db")
 APP_USER = os.environ.get("APP_USER", "admin")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 STATIC_DIR = (Path(__file__).parent / "static").resolve()
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -181,6 +183,7 @@ def clean_project(data, partial):
 
 def get_state(store, _body):
     return 200, {
+        "version": APP_VERSION,
         "projects": store.query("SELECT * FROM projects ORDER BY position, id"),
         "todos": [todo_out(t) for t in store.query("SELECT * FROM todos ORDER BY position, id")],
     }
@@ -290,7 +293,7 @@ ROUTES = [(m, re.compile(p + r"/?$"), h) for m, p, h in ROUTES]
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Klaar/1.0"
+    server_version = "Klaar"
     store = None  # set in main()
 
     def log_message(self, fmt, *args):
@@ -342,7 +345,7 @@ class Handler(BaseHTTPRequestHandler):
     def handle_any(self):
         path = urlparse(self.path).path
         if path == "/api/health":
-            return self.send_json(200, {"ok": True})
+            return self.send_json(200, {"ok": True, "version": APP_VERSION})
         if not self.authorized():
             self.send_response(401)
             self.send_header("WWW-Authenticate", 'Basic realm="Klaar", charset="UTF-8"')
@@ -396,7 +399,7 @@ def main():
     Handler.store = Store(DB_PATH)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     auth = "aan" if APP_PASSWORD else "uit"
-    print(f"Klaar draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, wachtwoord: {auth})", flush=True)
+    print(f"Klaar {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, wachtwoord: {auth})", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
