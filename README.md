@@ -12,8 +12,8 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
   `Notulen sturen #gemeente +overleg @morgen !hoog`
   - `@vandaag`, `@morgen`, `@overmorgen`, `@vrijdag` / `@vr`, `@volgendeweek`, `@20-10`, `@2026-10-20`
   - `!hoog` / `!middel` / `!laag` (of `!3` `!2` `!1`)
-  - `#naam` voor een klant of project, `+naam` voor een categorie (begin van de naam is genoeg)
-- **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie (slaat automatisch op)
+  - `#naam` voor een klant of project, `+naam` voor een categorie; meerdere `+` mag (begin van de naam is genoeg)
+- **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie-labels (slaat automatisch op)
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
 - Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `1`–`5` wissel weergave, `Esc` sluiten
@@ -24,15 +24,16 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 
 | Wat           | Betekenis                        | Voorbeeld                         |
 | ------------- | -------------------------------- | --------------------------------- |
-| **Klant**     | Voor wie je het werk doet        | Gemeente Utrecht, Provincie       |
+| **Klant**     | Voor wie je het werk doet (met eigen kleur) | Gemeente Utrecht, Provincie |
 | **Project**   | Een klus, optioneel onder een klant | Koppeling Suite4, Sprint 42    |
-| **Categorie** | Wat voor soort werk het is       | Overleg, Ontwikkeling, Support    |
+| **Categorie** | Labels: wat voor soort werk het is | Overleg, Ontwikkeling, Support  |
 
-- Een taak heeft hooguit één klant, één project en één categorie.
+- Een taak heeft hooguit één klant en één project, maar zoveel categorieën als je wilt. Klik in het detailpaneel op een label om het aan of uit te zetten, of maak er direct een nieuwe aan met **+ Nieuw**.
+- Alleen klanten hebben een kleur; projecten en categorieën zijn neutraal, zodat de kleur altijd betekent: voor wie is dit.
 - Kies je een project dat bij een klant hoort, dan krijgt de taak automatisch die klant. Kies je een andere klant, dan vervalt het project van de oude klant.
 - Projecten zonder klant (bijv. intern werk) staan in de zijbalk onder *Projecten*; projecten van een klant staan onder die klant.
 - De klantweergave groepeert taken per project. Een categorie loopt dwars door alle klanten heen, zodat je bijvoorbeeld al je overleggen bij elkaar ziet.
-- Sleep een taak naar een klant, project of categorie in de zijbalk om hem daar onder te brengen.
+- Sleep een taak naar een klant of project in de zijbalk om hem te verplaatsen, of naar een categorie om dat label toe te voegen.
 
 ## Starten
 

@@ -58,6 +58,7 @@ const ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   coffee: '<svg viewBox="0 0 24 24"><path d="M4 9h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3"/></svg>',
   briefcase: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
   folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
 };
@@ -87,13 +88,15 @@ const clientById = (id) => state.clients.find((c) => c.id === id);
 const categoryById = (id) => state.categories.find((c) => c.id === id);
 
 // The ways a todo can be grouped. A client is who the work is for (projects
-// can belong to one), a category is what kind of work it is.
+// can belong to one), categories are labels for what kind of work it is.
 const KINDS = {
   client: { list: 'clients', field: 'client_id', title: 'Klant', noun: 'klant', create: 'Nieuwe klant', placeholder: 'Bijv. Gemeente Utrecht' },
   project: { list: 'projects', field: 'project_id', title: 'Project', noun: 'project', create: 'Nieuw project', placeholder: 'Bijv. Migratie Suite4, Sprint 42' },
-  category: { list: 'categories', field: 'category_id', title: 'Categorie', noun: 'categorie', create: 'Nieuwe categorie', placeholder: 'Bijv. Overleg, Support, Ontwikkeling' },
+  category: { list: 'categories', field: 'category_ids', title: 'Categorie', noun: 'categorie', create: 'Nieuwe categorie', placeholder: 'Bijv. Overleg, Support, Ontwikkeling' },
 };
 const groupById = (kind, id) => state[KINDS[kind].list].find((g) => g.id === id);
+// A task has one client and project, but any number of categories (labels).
+const inGroup = (t, kind, id) => (kind === 'category' ? t.category_ids.includes(id) : t[KINDS[kind].field] === id);
 
 const VIEWS = {
   today: { title: 'Vandaag', icon: ICONS.sun, key: '1', filter: (t) => !t.done && t.due && t.due <= today() },
@@ -145,7 +148,7 @@ const exact = (list, q) => list.find((x) => norm(x.name) === q);
 const prefix = (list, q) => list.find((x) => norm(x.name).startsWith(q));
 
 function parseQuick(text) {
-  const out = { title: text, priority: null, due: null, project: null, client: null, category: null };
+  const out = { title: text, priority: null, due: null, project: null, client: null, categories: [] };
   const words = [];
   for (const word of text.split(/\s+/)) {
     let m;
@@ -168,7 +171,7 @@ function parseQuick(text) {
     } else if ((m = word.match(/^\+(.+)$/))) {
       const q = m[1].toLowerCase();
       const cat = exact(state.categories, q) || prefix(state.categories, q);
-      if (cat) out.category = cat; else words.push(word);
+      if (cat) { if (!out.categories.includes(cat)) out.categories.push(cat); } else words.push(word);
     } else {
       words.push(word);
     }
@@ -183,7 +186,7 @@ function counts() {
   const c = {};
   for (const [k, v] of Object.entries(VIEWS)) c[k] = state.todos.filter(v.filter).length;
   for (const [kind, k] of Object.entries(KINDS)) {
-    for (const g of state[k.list]) c[kind + ':' + g.id] = open.filter((t) => t[k.field] === g.id).length;
+    for (const g of state[k.list]) c[kind + ':' + g.id] = open.filter((t) => inGroup(t, kind, g.id)).length;
   }
   return c;
 }
@@ -198,7 +201,7 @@ function renderSidebar() {
 
   const row = (kind, g, cls = '') => `
     <div class="nav-item ${cls} ${state.view === kind + ':' + g.id && !state.search ? 'active' : ''}" data-view="${kind}:${g.id}" data-kind="${kind}" data-id="${g.id}" role="button" tabindex="0">
-      <span class="dot ${kind}" style="background:${g.color}"></span>
+      ${kind === 'client' ? `<span class="dot client" style="background:${g.color}"></span>` : `<span class="nav-icon muted">${kind === 'project' ? ICONS.folder : ICONS.tag}</span>`}
       <span class="label">${esc(g.name)}</span>
       <span class="count">${c[kind + ':' + g.id] || ''}</span>
       <span class="proj-actions">
@@ -227,7 +230,7 @@ function viewGroups() {
 
   if (state.search) {
     const q = state.search.toLowerCase();
-    const names = (t) => [clientById(t.client_id), projectById(t.project_id), categoryById(t.category_id)]
+    const names = (t) => [clientById(t.client_id), projectById(t.project_id), ...t.category_ids.map(categoryById)]
       .filter(Boolean).map((g) => g.name.toLowerCase()).join(' ');
     const hits = state.todos.filter((t) => t.title.toLowerCase().includes(q) || t.notes.toLowerCase().includes(q) || names(t).includes(q));
     return [
@@ -239,7 +242,7 @@ function viewGroups() {
   const scope = currentScope();
   if (scope) {
     const { kind, item } = scope;
-    const mine = state.todos.filter((t) => t[KINDS[kind].field] === item.id);
+    const mine = state.todos.filter((t) => inGroup(t, kind, item.id));
     const open = mine.filter((t) => !t.done).sort(posSort);
     const done = { key: kind + '-done', label: 'Voltooid', items: mine.filter((t) => t.done).sort(doneSort), collapsible: true };
     if (kind !== 'client') return [{ key: kind + '-open', items: open, sortable: true }, done];
@@ -289,13 +292,15 @@ function renderTodo(t, sortable) {
   const scope = currentScope();
   const cl = t.client_id ? clientById(t.client_id) : null;
   const p = t.project_id ? projectById(t.project_id) : null;
-  const cat = t.category_id ? categoryById(t.category_id) : null;
+  const labels = t.category_ids.filter((id) => !(scope?.kind === 'category' && scope.item.id === id)).map(categoryById).filter(Boolean);
   const meta = [];
   // Client and project are implied by a client or project view (and its group headers).
   if ((cl || p) && (!scope || scope.kind === 'category')) {
-    meta.push(`<span><i class="dot" style="background:${(cl || p).color}"></i>${[cl, p].filter(Boolean).map((g) => esc(g.name)).join(' › ')}</span>`);
+    // Only clients carry a colour; a project without a client gets a neutral folder icon.
+    const mark = cl ? `<i class="dot" style="background:${cl.color}"></i>` : ICONS.folder;
+    meta.push(`<span>${mark}${[cl, p].filter(Boolean).map((g) => esc(g.name)).join(' › ')}</span>`);
   }
-  if (cat && scope?.kind !== 'category') meta.push(`<span class="cat" style="--c:${cat.color}">${esc(cat.name)}</span>`);
+  for (const cat of labels) meta.push(`<span class="cat">${esc(cat.name)}</span>`);
   if (t.due) {
     const d = dayDiff(t.due);
     const cls = t.done ? '' : d < 0 ? 'overdue' : d === 0 ? 'today' : '';
@@ -427,19 +432,20 @@ function renderDrawer() {
           </select>
         </div>
         <div class="field">
-          <label for="dCategory">Categorie</label>
-          <select id="dCategory">
-            <option value="">Geen categorie</option>
-            ${options(state.categories, t.category_id)}
+          <label for="dProject">Project</label>
+          <select id="dProject">
+            <option value="">Geen project</option>
+            ${projectOptions(t)}
           </select>
         </div>
       </div>
       <div class="field">
-        <label for="dProject">Project</label>
-        <select id="dProject">
-          <option value="">Geen project</option>
-          ${projectOptions(t)}
-        </select>
+        <label>Categorieën</label>
+        <div class="labels">
+          ${state.categories.map((c) => `
+            <button class="label-pill ${t.category_ids.includes(c.id) ? 'on' : ''}" data-label="${c.id}" aria-pressed="${t.category_ids.includes(c.id)}">${ICONS.tag}${esc(c.name)}</button>`).join('')}
+          <button class="label-pill add" data-act="new-label">${ICONS.plus}Nieuw</button>
+        </div>
       </div>
       <div class="field">
         <label for="dNotes">Notities</label>
@@ -523,8 +529,8 @@ async function deleteTodo(id) {
   try {
     await api('DELETE', `/api/todos/${id}`);
     toast('Taak verwijderd', 'Ongedaan maken', async () => {
-      const { title, notes, priority, due, client_id, project_id, category_id, position, done } = t;
-      replaceTodo(await api('POST', '/api/todos', { title, notes, priority, due, client_id, project_id, category_id, position, done }));
+      const { title, notes, priority, due, client_id, project_id, category_ids, position, done } = t;
+      replaceTodo(await api('POST', '/api/todos', { title, notes, priority, due, client_id, project_id, category_ids, position, done }));
       render();
     });
   } catch (e) { toast('Verwijderen mislukt: ' + e.message); load(); }
@@ -542,8 +548,9 @@ async function addTodo(text) {
   else if (q.client) body.client_id = q.client.id;
   else if (scope?.kind === 'project') body.project_id = scope.item.id;
   else if (scope?.kind === 'client') body.client_id = scope.item.id;
-  if (q.category) body.category_id = q.category.id;
-  else if (scope?.kind === 'category') body.category_id = scope.item.id;
+  const labels = new Set(q.categories.map((c) => c.id));
+  if (scope?.kind === 'category') labels.add(scope.item.id);
+  if (labels.size) body.category_ids = [...labels];
   try {
     replaceTodo(await api('POST', '/api/todos', body));
     refresh();
@@ -589,7 +596,7 @@ function groupDialog(kind, item) {
             <option value="">Geen klant (intern)</option>
             ${options(state.clients, clientId)}
           </select>` : ''}
-        <div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch ${c === color ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Kleur ${c}"></button>`).join('')}</div>
+        ${kind === 'client' ? `<div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch ${c === color ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Kleur ${c}"></button>`).join('')}</div>` : ''}
         <div class="actions">
           <button type="button" class="btn ghost" data-act="cancel">Annuleren</button>
           <button type="submit" class="btn primary">${item ? 'Opslaan' : 'Aanmaken'}</button>
@@ -612,7 +619,7 @@ function groupDialog(kind, item) {
       e.preventDefault();
       const name = form.name.value.trim();
       if (!name) return;
-      const res = { name, color };
+      const res = kind === 'client' ? { name, color } : { name };
       if (kind === 'project') res.client_id = form.client.value ? Number(form.client.value) : null;
       close(res);
     });
@@ -653,6 +660,17 @@ async function addGroup(kind) {
   } catch (e) { toast('Aanmaken mislukt: ' + e.message); }
 }
 
+/* Create a category from the details panel and put it straight on the task. */
+async function newLabelFor(todoId) {
+  const res = await groupDialog('category', null);
+  if (!res) return;
+  try {
+    const cat = await api('POST', '/api/categories', res);
+    state.categories.push(cat);
+    await updateTodo(todoId, { category_ids: [...byId(todoId).category_ids, cat.id] }, { drawer: true });
+  } catch (e) { toast('Aanmaken mislukt: ' + e.message); }
+}
+
 async function editGroup(kind, id) {
   const res = await groupDialog(kind, groupById(kind, id));
   if (!res) return;
@@ -665,7 +683,7 @@ async function editGroup(kind, id) {
 async function deleteGroup(kind, id) {
   const K = KINDS[kind];
   const g = groupById(kind, id);
-  const n = state.todos.filter((t) => t[K.field] === id).length;
+  const n = state.todos.filter((t) => inGroup(t, kind, id)).length;
   const extra = kind === 'client' && state.projects.some((p) => p.client_id === id) ? ' Projecten van deze klant blijven ook bestaan.' : '';
   const ok = await confirmDialog(`“${g.name}” verwijderen?`, (n
     ? `De ${n} ${n === 1 ? 'taak blijft' : 'taken blijven'} bewaard, maar zonder ${K.noun}.`
@@ -729,7 +747,13 @@ function bind() {
     sidebar.querySelectorAll('.drop-target').forEach((x) => x.classList.remove('drop-target'));
     if (!target || !dragId) return;
     e.preventDefault();
-    if (target.dataset.kind) updateTodo(dragId, { [KINDS[target.dataset.kind].field]: Number(target.dataset.id) });
+    const { kind } = target.dataset;
+    const id = Number(target.dataset.id);
+    if (kind === 'category') {
+      const t = byId(dragId);
+      if (!t.category_ids.includes(id)) updateTodo(dragId, { category_ids: [...t.category_ids, id] });
+      toast(`Label “${categoryById(id).name}” toegevoegd`);
+    } else if (kind) updateTodo(dragId, { [KINDS[kind].field]: id });
     else updateTodo(dragId, { due: today() });
   });
 
@@ -815,6 +839,13 @@ function bind() {
     if (act === 'delete') return deleteTodo(id);
     const prio = e.target.closest('[data-prio]');
     if (prio) return updateTodo(id, { priority: Number(prio.dataset.prio) }, { drawer: true });
+    const label = e.target.closest('[data-label]');
+    if (label) {
+      const cid = Number(label.dataset.label);
+      const ids = byId(id).category_ids;
+      return updateTodo(id, { category_ids: ids.includes(cid) ? ids.filter((x) => x !== cid) : [...ids, cid] }, { drawer: true });
+    }
+    if (act === 'new-label') return newLabelFor(id);
     const due = e.target.closest('[data-due]');
     if (due) return updateTodo(id, { due: due.dataset.due || null }, { drawer: true });
   });
@@ -839,7 +870,7 @@ function bind() {
   drawer.addEventListener('change', (e) => {
     const id = state.selected;
     if (e.target.id === 'dDue') updateTodo(id, { due: e.target.value || null }, { drawer: true });
-    const ref = { dClient: 'client_id', dProject: 'project_id', dCategory: 'category_id' }[e.target.id];
+    const ref = { dClient: 'client_id', dProject: 'project_id' }[e.target.id];
     if (ref) updateTodo(id, { [ref]: e.target.value ? Number(e.target.value) : null }, { drawer: true });
   });
 
@@ -887,8 +918,8 @@ function renderChips() {
   if (q.due) chips.push(`<span class="chip">${ICONS.calendar}${dueLabel(q.due)}</span>`);
   if (q.priority) chips.push(`<span class="chip" style="color:${PRIOS[q.priority].color};background:color-mix(in srgb, ${PRIOS[q.priority].color} 14%, transparent)">${ICONS.flag}${PRIOS[q.priority].label}</span>`);
   if (q.client) chips.push(`<span class="chip" style="color:${q.client.color};background:color-mix(in srgb, ${q.client.color} 14%, transparent)">${ICONS.briefcase}${esc(q.client.name)}</span>`);
-  if (q.category) chips.push(`<span class="chip" style="color:${q.category.color};background:color-mix(in srgb, ${q.category.color} 14%, transparent)">${ICONS.tag}${esc(q.category.name)}</span>`);
-  if (q.project) chips.push(`<span class="chip" style="color:${q.project.color};background:color-mix(in srgb, ${q.project.color} 14%, transparent)">${ICONS.folder}${esc(q.project.name)}</span>`);
+  for (const cat of q.categories) chips.push(`<span class="chip neutral">${ICONS.tag}${esc(cat.name)}</span>`);
+  if (q.project) chips.push(`<span class="chip neutral">${ICONS.folder}${esc(q.project.name)}</span>`);
   const el = $('#chips');
   el.innerHTML = chips.join('');
   el.classList.toggle('show', chips.length > 0);
@@ -903,7 +934,7 @@ async function load() {
     state.categories = data.categories || [];
     const v = data.version || 'dev';
     $('#version').textContent = /^\d/.test(v) ? 'v' + v : v;
-    state.todos = data.todos;
+    state.todos = data.todos.map((t) => ({ ...t, category_ids: t.category_ids || [] }));
     if (/^(client|project|category):/.test(state.view) && !currentScope()) state.view = 'today';
     if (state.selected && !byId(state.selected)) state.selected = null;
     const editing = $('#drawer').contains(document.activeElement);

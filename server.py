@@ -76,10 +76,23 @@ MIGRATIONS = [
     ("todos", "category_id", "INTEGER REFERENCES categories(id) ON DELETE SET NULL"),
 ]
 
+# Tasks can carry several categories (shown as labels).
+LABELS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS todo_categories (
+    todo_id     INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (todo_id, category_id)
+);
+-- 1.1/1.2 stored one category per task in todos.category_id; move it over.
+INSERT OR IGNORE INTO todo_categories (todo_id, category_id)
+    SELECT id, category_id FROM todos WHERE category_id IS NOT NULL;
+UPDATE todos SET category_id = NULL WHERE category_id IS NOT NULL;
+"""
+
 INDEXES = """
 CREATE INDEX IF NOT EXISTS todos_project ON todos(project_id);
 CREATE INDEX IF NOT EXISTS todos_client ON todos(client_id);
-CREATE INDEX IF NOT EXISTS todos_category ON todos(category_id);
+CREATE INDEX IF NOT EXISTS todo_categories_category ON todo_categories(category_id);
 CREATE INDEX IF NOT EXISTS projects_client ON projects(client_id);
 """
 
@@ -127,6 +140,7 @@ class Store:
                 existing = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
                 if column not in existing:
                     self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+            self.conn.executescript(LABELS_SCHEMA)
             self.conn.executescript(INDEXES)
             self.conn.commit()
 
@@ -151,9 +165,28 @@ class Store:
             self.conn.commit()
 
 
-def todo_out(row):
+def todo_out(row, category_ids):
     row["done"] = bool(row["done"])
+    row.pop("category_id", None)  # superseded by todo_categories
+    row["category_ids"] = category_ids
     return row
+
+
+def load_todo(store, todo_id):
+    row = store.one("SELECT * FROM todos WHERE id=?", (todo_id,))
+    cats = [r["category_id"] for r in store.query(
+        "SELECT category_id FROM todo_categories WHERE todo_id=? ORDER BY category_id", (todo_id,))]
+    return todo_out(row, cats)
+
+
+def set_categories(store, todo_id, category_ids):
+    with store.lock:
+        store.conn.execute("DELETE FROM todo_categories WHERE todo_id=?", (todo_id,))
+        store.conn.executemany(
+            "INSERT INTO todo_categories (todo_id, category_id) VALUES (?, ?)",
+            [(todo_id, c) for c in category_ids],
+        )
+        store.conn.commit()
 
 
 def clean_ref(store, data, out, key, table, label):
@@ -203,7 +236,16 @@ def clean_todo(store, data, partial):
             raise BadRequest("due moet YYYY-MM-DD zijn")
     clean_ref(store, data, out, "project_id", "projects", "project")
     clean_ref(store, data, out, "client_id", "clients", "klant")
-    clean_ref(store, data, out, "category_id", "categories", "categorie")
+    if "category_ids" in data:
+        ids = data["category_ids"]
+        if not isinstance(ids, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
+            raise BadRequest("category_ids moet een lijst met getallen zijn")
+        ids = sorted(set(ids))
+        if ids:
+            marks = ",".join("?" for _ in ids)
+            if store.one(f"SELECT COUNT(*) AS n FROM categories WHERE id IN ({marks})", ids)["n"] != len(ids):
+                raise BadRequest("onbekende categorie")
+        out["category_ids"] = ids
     if "done" in data:
         out["done"] = 1 if data["done"] else 0
     clean_position(data, out)
@@ -255,7 +297,12 @@ def get_state(store, _body):
     state = {"version": APP_VERSION}
     for table in GROUPS:
         state[table] = store.query(f"SELECT * FROM {table} ORDER BY position, id")
-    state["todos"] = [todo_out(t) for t in store.query("SELECT * FROM todos ORDER BY position, id")]
+    labels = {}
+    for r in store.query("SELECT todo_id, category_id FROM todo_categories ORDER BY category_id"):
+        labels.setdefault(r["todo_id"], []).append(r["category_id"])
+    state["todos"] = [
+        todo_out(t, labels.get(t["id"], [])) for t in store.query("SELECT * FROM todos ORDER BY position, id")
+    ]
     return 200, state
 
 
@@ -267,6 +314,7 @@ def get_export(store, _body):
 
 def create_todo(store, body):
     fields = clean_todo(store, body, partial=False)
+    category_ids = fields.pop("category_ids", [])
     reconcile_client(store, fields, None)
     if "position" not in fields:
         lowest = store.one("SELECT MIN(position) AS p FROM todos")["p"]
@@ -277,7 +325,8 @@ def create_todo(store, body):
     cols = ", ".join(fields)
     marks = ", ".join("?" for _ in fields)
     cur = store.execute(f"INSERT INTO todos ({cols}) VALUES ({marks})", tuple(fields.values()))
-    return 201, todo_out(store.one("SELECT * FROM todos WHERE id=?", (cur.lastrowid,)))
+    set_categories(store, cur.lastrowid, category_ids)
+    return 201, load_todo(store, cur.lastrowid)
 
 
 def update_todo(store, body, todo_id):
@@ -286,13 +335,16 @@ def update_todo(store, body, todo_id):
     if not current:
         raise NotFound()
     fields = clean_todo(store, body, partial=True)
+    category_ids = fields.pop("category_ids", None)
     reconcile_client(store, fields, current)
     if "done" in fields and fields["done"] != current["done"]:
         fields["completed_at"] = now() if fields["done"] else None
     if fields:
         sets = ", ".join(f"{k}=?" for k in fields)
         store.execute(f"UPDATE todos SET {sets} WHERE id=?", (*fields.values(), todo_id))
-    return 200, todo_out(store.one("SELECT * FROM todos WHERE id=?", (todo_id,)))
+    if category_ids is not None:
+        set_categories(store, todo_id, category_ids)
+    return 200, load_todo(store, todo_id)
 
 
 def delete_todo(store, _body, todo_id):
