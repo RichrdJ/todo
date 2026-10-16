@@ -4,6 +4,18 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-16
+
+### Toegevoegd
+- Agenda als startpagina: weekrooster van 2, 3 of 4 weken met je taken per dag
+- Taken naar een andere dag slepen om ze te verzetten; **+** per dag om direct een taak op die dag te maken
+- Vak *Te laat* en *Nog inplannen* (taken zonder datum) naast de agenda; sleep ze naar een dag om ze in te plannen
+- Op mobiel een lijst per dag, met *Te laat* en *Nog inplannen* bovenaan
+
+### Gewijzigd
+- De app opent altijd op de agenda; klik op het logo om ernaar terug te gaan
+- Sneltoetsen: `1` agenda, `2` vandaag, `3` gepland, `4` alle taken, `5` belangrijk, `6` voltooid
+
 ## [1.3.2] - 2026-10-16
 
 ### Gewijzigd
@@ -59,7 +71,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/RichrdJ/todo/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/RichrdJ/todo/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RichrdJ/todo/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RichrdJ/todo/compare/v1.2.0...v1.3.0

@@ -58,6 +58,9 @@ const ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   coffee: '<svg viewBox="0 0 24 24"><path d="M4 9h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3"/></svg>',
   briefcase: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M9 9v12M15 9v12M3 15h18"/></svg>',
+  left: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
   folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
@@ -80,7 +83,9 @@ const state = {
   projects: [],
   categories: [],
   todos: [],
-  view: store.get('view') || 'today',
+  view: 'agenda', // the agenda is the home page
+  agendaWeeks: [2, 3, 4].includes(Number(store.get('weeks'))) ? Number(store.get('weeks')) : 3,
+  agendaOffset: 0, // weeks from the current week
   search: '',
   selected: null,
   collapsed: new Set(JSON.parse(store.get('collapsed') || '[]')),
@@ -102,11 +107,12 @@ const groupById = (kind, id) => state[KINDS[kind].list].find((g) => g.id === id)
 const inGroup = (t, kind, id) => (kind === 'category' ? t.category_ids.includes(id) : t[KINDS[kind].field] === id);
 
 const VIEWS = {
-  today: { title: 'Vandaag', icon: ICONS.sun, key: '1', filter: (t) => !t.done && t.due && t.due <= today() },
-  upcoming: { title: 'Gepland', icon: ICONS.calendar, key: '2', filter: (t) => !t.done && t.due },
-  all: { title: 'Alle taken', icon: ICONS.inbox, key: '3', filter: (t) => !t.done },
-  important: { title: 'Belangrijk', icon: ICONS.flag, key: '4', filter: (t) => !t.done && t.priority === 3 },
-  done: { title: 'Voltooid', icon: ICONS.checkCircle, key: '5', filter: (t) => t.done },
+  agenda: { title: 'Agenda', icon: ICONS.grid, key: '1', filter: (t) => !t.done },
+  today: { title: 'Vandaag', icon: ICONS.sun, key: '2', filter: (t) => !t.done && t.due && t.due <= today() },
+  upcoming: { title: 'Gepland', icon: ICONS.calendar, key: '3', filter: (t) => !t.done && t.due },
+  all: { title: 'Alle taken', icon: ICONS.inbox, key: '4', filter: (t) => !t.done },
+  important: { title: 'Belangrijk', icon: ICONS.flag, key: '5', filter: (t) => !t.done && t.priority === 3 },
+  done: { title: 'Voltooid', icon: ICONS.checkCircle, key: '6', filter: (t) => t.done },
 };
 
 /* The client, project or category whose view is open, if any. */
@@ -199,7 +205,7 @@ function renderSidebar() {
   $('#nav').innerHTML = Object.entries(VIEWS).map(([k, v]) => `
     <button class="nav-item ${state.view === k && !state.search ? 'active' : ''}" data-view="${k}">
       <span class="nav-icon">${v.icon}</span><span class="label">${v.title}</span>
-      <span class="count">${k === 'done' ? '' : c[k] || ''}</span>
+      <span class="count">${k === 'done' || k === 'agenda' ? '' : c[k] || ''}</span>
     </button>`).join('');
 
   const row = (kind, g, cls = '') => `
@@ -330,7 +336,87 @@ function emptyState() {
   return { icon: ICONS.inbox, h: 'Lekker leeg', p: 'Voeg hierboven je eerste taak toe.' };
 }
 
+/* ---------- Agenda ---------- */
+const isAgenda = () => state.view === 'agenda' && !state.search;
+
+function agendaRange() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + state.agendaOffset * 7); // Monday
+  const days = Array.from({ length: state.agendaWeeks * 7 }, (_, i) => addDays(i, start));
+  return { days, from: days[0], to: days[days.length - 1] };
+}
+
+function renderAgendaItem(t) {
+  const cl = t.client_id ? clientById(t.client_id) : null;
+  const p = t.project_id ? projectById(t.project_id) : null;
+  const tip = [t.title, [cl, p].filter(Boolean).map((g) => g.name).join(' › ')].filter(Boolean).join(' — ');
+  return `
+    <li class="ag-item p${t.priority} ${t.done ? 'done' : ''} ${state.selected === t.id ? 'selected' : ''}" data-id="${t.id}" draggable="true"
+        style="--cc:${cl ? cl.color : 'var(--border-strong)'}" title="${esc(tip)}">
+      <button class="mini-check" data-act="toggle" aria-label="${t.done ? 'Markeer als open' : 'Afvinken'}">${ICONS.check}</button>
+      <span class="ag-title">${esc(t.title)}</span>
+    </li>`;
+}
+
+function renderAgenda() {
+  const { days } = agendaRange();
+  const t0 = today();
+  const posSort = (a, b) => b.priority - a.priority || a.position - b.position || a.id - b.id;
+  const byDay = new Map(days.map((d) => [d, []]));
+  for (const t of state.todos) if (t.due && byDay.has(t.due)) byDay.get(t.due).push(t);
+
+  const weekdays = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
+  let html = '<div class="agenda"><div class="cal">';
+  html += weekdays.map((w, i) => `<div class="cal-wd ${i > 4 ? 'weekend' : ''}">${w}</div>`).join('');
+  days.forEach((d, i) => {
+    const date = parseYmd(d);
+    const items = byDay.get(d);
+    // Open tasks from past days live in the "Te laat" tray, so past days only show what got done.
+    const open = d < t0 ? [] : items.filter((t) => !t.done).sort(posSort);
+    const done = items.filter((t) => t.done);
+    const month = i === 0 || date.getDate() === 1 ? date.toLocaleDateString('nl-NL', { month: 'short' }) : '';
+    html += `
+      <div class="day ${d === t0 ? 'is-today' : ''} ${d < t0 ? 'is-past' : ''} ${i % 7 > 4 ? 'weekend' : ''}" data-date="${d}">
+        <div class="day-head">
+          <span class="dname">${WEEKDAYS[date.getDay()]}</span>
+          <span class="dnum">${date.getDate()}</span><span class="dmonth">${month}</span>
+          <button class="day-add" data-act="add-day" title="Taak op ${dueLabel(d).toLowerCase()}" aria-label="Taak toevoegen">${ICONS.plus}</button>
+        </div>
+        <ul class="day-items">${open.map(renderAgendaItem).join('')}${done.map(renderAgendaItem).join('')}</ul>
+      </div>`;
+  });
+  html += '</div>';
+
+  const overdue = state.todos.filter((t) => !t.done && t.due && t.due < t0).sort((a, b) => a.due.localeCompare(b.due));
+  const undated = state.todos.filter((t) => !t.done && !t.due).sort(posSort);
+  const section = (key, label, items, hint) => `
+    <section class="tray-sec ${key}" data-date="${key === 'undated' ? '' : 'keep'}">
+      <h4>${label} <span class="n">${items.length}</span></h4>
+      ${items.length ? `<ul class="day-items">${items.map(renderAgendaItem).join('')}</ul>` : `<p class="tray-hint">${hint}</p>`}
+    </section>`;
+  html += `<aside class="tray">
+    ${overdue.length ? section('overdue', 'Te laat', overdue, '') : ''}
+    ${section('undated', 'Nog inplannen', undated, 'Taken zonder datum komen hier. Sleep ze naar een dag om ze in te plannen.')}
+  </aside></div>`;
+  $('#listWrap').innerHTML = html;
+}
+
+function renderAgendaTools() {
+  const tools = $('#viewTools');
+  if (!isAgenda()) { tools.innerHTML = ''; return; }
+  tools.innerHTML = `
+    <div class="seg mini">${[2, 3, 4].map((w) => `<button class="${state.agendaWeeks === w ? 'on' : ''}" data-weeks="${w}">${w} wk</button>`).join('')}</div>
+    <div class="nav-btns">
+      <button class="icon-btn" data-agenda="-1" title="Vorige week" aria-label="Vorige week">${ICONS.left}</button>
+      <button class="btn ghost small" data-agenda="0" ${state.agendaOffset === 0 ? 'disabled' : ''}>Deze week</button>
+      <button class="icon-btn" data-agenda="1" title="Volgende week" aria-label="Volgende week">${ICONS.right}</button>
+    </div>`;
+}
+
 function renderList() {
+  document.querySelector('.main').classList.toggle('wide', isAgenda());
+  if (isAgenda()) return renderAgenda();
   const groups = viewGroups().filter((g) => g.items.length);
   const hasOpen = groups.some((g) => !g.collapsible);
   let html = '';
@@ -378,7 +464,14 @@ function renderHeader() {
     if (n !== null) sub = state.view === 'done' ? `${n} afgerond` : `${n} open ${n === 1 ? 'taak' : 'taken'}`;
     if (scope) sub = `${KINDS[scope.kind].title} · ${sub}`;
   }
+  if (isAgenda()) {
+    const { from, to } = agendaRange();
+    const fmt = (d) => parseYmd(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    const planned = state.todos.filter((t) => !t.done && t.due && t.due >= from && t.due <= to).length;
+    sub = `${fmt(from)} – ${fmt(to)} · ${planned} gepland`;
+  }
   $('#viewSub').textContent = sub.replace(/^./, (c) => c.toUpperCase());
+  renderAgendaTools();
 
   const ph = scope
     ? `Nieuwe taak ${scope.kind === 'client' ? 'voor' : 'in'} ${scope.item.name}…`
@@ -541,12 +634,13 @@ async function deleteTodo(id) {
   } catch (e) { toast('Verwijderen mislukt: ' + e.message); load(); }
 }
 
-async function addTodo(text) {
+async function addTodo(text, { due } = {}) {
   const q = parseQuick(text);
   if (!q.title) return;
   const scope = currentScope();
   const body = { title: q.title, priority: q.priority ?? (state.view === 'important' && !state.search ? 3 : 0) };
   if (q.due) body.due = q.due;
+  else if (due) body.due = due;
   else if (state.view === 'today' && !state.search) body.due = today();
   else if (state.view === 'upcoming' && !state.search) body.due = addDays(1);
   if (q.project) body.project_id = q.project.id;
@@ -574,11 +668,34 @@ async function reorder(ids) {
   catch (e) { toast('Volgorde opslaan mislukt'); load(); }
 }
 
+/* Inline "new task" field inside an agenda day. Quick-add tokens work here too. */
+function openDayInput(day) {
+  if (!day || day.querySelector('.day-input')) return;
+  const input = document.createElement('input');
+  input.className = 'day-input';
+  input.placeholder = 'Nieuwe taak…';
+  input.maxLength = 500;
+  day.querySelector('.day-items').append(input);
+  input.focus();
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    const text = input.value.trim();
+    input.remove();
+    if (save && text) addTodo(text, { due: day.dataset.date });
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
 function setView(view) {
   state.view = view;
   state.search = '';
   $('#search').value = '';
-  store.set('view', view);
   document.body.classList.remove('nav-open');
   render();
 }
@@ -797,8 +914,19 @@ function bind() {
   input.addEventListener('input', renderChips);
   input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = ''; renderChips(); input.blur(); } });
 
+  $('#viewTools').addEventListener('click', (e) => {
+    const weeks = e.target.closest('[data-weeks]');
+    if (weeks) { state.agendaWeeks = Number(weeks.dataset.weeks); store.set('weeks', state.agendaWeeks); }
+    const nav = e.target.closest('[data-agenda]');
+    if (nav) state.agendaOffset = Number(nav.dataset.agenda) === 0 ? 0 : state.agendaOffset + Number(nav.dataset.agenda);
+    if (weeks || nav) { renderHeader(); renderList(); }
+  });
+  $('.brand').addEventListener('click', (e) => { if (!e.target.closest('#themeToggle')) { state.agendaOffset = 0; setView('agenda'); } });
+
   const list = $('#listWrap');
   list.addEventListener('click', (e) => {
+    const addDay = e.target.closest('[data-act="add-day"]');
+    if (addDay) return openDayInput(addDay.closest('.day'));
     const collapse = e.target.closest('[data-act="collapse"]');
     if (collapse) {
       const key = collapse.dataset.group + ':open';
@@ -806,7 +934,7 @@ function bind() {
       store.set('collapsed', JSON.stringify([...state.collapsed]));
       return renderList();
     }
-    const li = e.target.closest('.todo');
+    const li = e.target.closest('.todo, .ag-item');
     if (!li) return;
     const id = Number(li.dataset.id);
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -818,8 +946,38 @@ function bind() {
     if (state.selected && innerWidth > 820) setTimeout(() => $('#dTitle')?.focus(), 50);
   });
 
+  // Agenda: drag a task onto a day to (re)schedule it, or onto "Nog inplannen" to clear its date.
+  const dayTarget = (e) => e.target.closest?.('.day, .tray-sec.undated');
+  list.addEventListener('dragover', (e) => {
+    const target = dayTarget(e);
+    if (!target || !dragId) return;
+    e.preventDefault();
+    list.querySelectorAll('.drop-target').forEach((x) => x !== target && x.classList.remove('drop-target'));
+    target.classList.add('drop-target');
+  });
+  list.addEventListener('dragleave', (e) => {
+    const target = dayTarget(e);
+    if (target && !target.contains(e.relatedTarget)) target.classList.remove('drop-target');
+  });
+  list.addEventListener('drop', (e) => {
+    const target = dayTarget(e);
+    if (!target || !dragId) return;
+    e.preventDefault();
+    target.classList.remove('drop-target');
+    const due = target.dataset.date || null;
+    if (byId(dragId).due !== due) updateTodo(dragId, { due }, { drawer: state.selected === dragId });
+  });
+
   // Drag & drop reordering within a group.
   list.addEventListener('dragstart', (e) => {
+    const ag = e.target.closest('.ag-item');
+    if (ag) {
+      dragId = Number(ag.dataset.id);
+      ag.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(dragId));
+      return;
+    }
     const li = e.target.closest('.todo[draggable]');
     if (!li) return;
     dragId = Number(li.dataset.id);
@@ -829,7 +987,7 @@ function bind() {
   });
   list.addEventListener('dragend', () => {
     dragId = null;
-    list.querySelectorAll('.dragging, .drag-over-top, .drag-over-bottom').forEach((x) => x.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom'));
+    list.querySelectorAll('.dragging, .drag-over-top, .drag-over-bottom, .drop-target').forEach((x) => x.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom', 'drop-target'));
   });
   list.addEventListener('dragover', (e) => {
     const li = e.target.closest('.todo[draggable]');

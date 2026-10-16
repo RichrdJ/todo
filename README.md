@@ -6,6 +6,7 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 
 ## Features
 
+- **Agenda als startpagina**: je taken in een weekrooster van 2, 3 of 4 weken (zie hieronder)
 - **Slimme weergaven**: Vandaag (incl. te laat), Gepland (per dag gegroepeerd), Alle taken, Belangrijk, Voltooid
 - **Klanten, projecten en categorieën** om je werk te scheiden (zie hieronder)
 - **Snel invoeren** in één regel:
@@ -16,9 +17,20 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 - **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie-labels (slaat automatisch op)
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
-- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `1`–`5` wissel weergave, `Esc` sluiten
+- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `1`–`6` wissel weergave, `Esc` sluiten
 - JSON-export via de zijbalk
 - Optioneel wachtwoord (HTTP basic auth)
+
+## Agenda
+
+De startpagina is een agenda van de komende weken (maandag t/m zondag), te wisselen tussen **2, 3 of 4 weken** en te verschuiven met de pijltjes.
+
+- Elke taak met een deadline staat op zijn dag, met de kleur van de klant als streepje en de prioriteit als rondje. Afvinken kan direct in de agenda; klik op een taak voor het detailpaneel.
+- **Sleep** een taak naar een andere dag om hem te verzetten.
+- Met de **+** bij een dag maak je meteen een taak op die dag (`#klant`, `+label` en `!hoog` werken ook hier).
+- Naast (of op smalle schermen boven) de agenda staan **Te laat** en **Nog inplannen**: taken zonder datum. Sleep ze naar een dag om ze in te plannen, of sleep een taak terug naar *Nog inplannen* om de datum weg te halen.
+- Op dagen in het verleden zie je wat je hebt afgerond; wat nog open staat, staat onder *Te laat*.
+- Klik op het logo om altijd terug te gaan naar de agenda.
 
 ## Klanten, projecten en categorieën
 
