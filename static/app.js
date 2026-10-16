@@ -429,6 +429,7 @@ function renderDrawer() {
           <select id="dClient">
             <option value="">Geen klant</option>
             ${options(state.clients, t.client_id)}
+            <option value="new">+ Nieuwe klant…</option>
           </select>
         </div>
         <div class="field">
@@ -436,6 +437,7 @@ function renderDrawer() {
           <select id="dProject">
             <option value="">Geen project</option>
             ${projectOptions(t)}
+            <option value="new">+ Nieuw project…</option>
           </select>
         </div>
       </div>
@@ -579,12 +581,14 @@ function setView(view) {
 }
 
 /* ---------- Clients, projects & categories ---------- */
-function groupDialog(kind, item) {
+function groupDialog(kind, item, defaults = {}) {
   const K = KINDS[kind];
   return new Promise((resolve) => {
     let color = item ? item.color : COLORS[state[K.list].length % COLORS.length];
     const scope = currentScope();
-    const clientId = item ? item.client_id : scope?.kind === 'client' ? scope.item.id : null;
+    const clientId = item ? item.client_id
+      : 'client_id' in defaults ? defaults.client_id
+      : scope?.kind === 'client' ? scope.item.id : null;
     const modal = $('#modal');
     modal.innerHTML = `
       <form class="box">
@@ -661,14 +665,19 @@ async function addGroup(kind) {
 }
 
 /* Create a category from the details panel and put it straight on the task. */
-async function newLabelFor(todoId) {
-  const res = await groupDialog('category', null);
-  if (!res) return;
+/* Create a client, project or category from the details panel and link it to the task straight away. */
+async function newGroupFor(todoId, kind) {
+  const t = byId(todoId);
+  // A new project defaults to the task's client.
+  const res = await groupDialog(kind, null, kind === 'project' ? { client_id: t.client_id } : {});
+  if (!res) return renderDrawer(); // reset the select that triggered this
   try {
-    const cat = await api('POST', '/api/categories', res);
-    state.categories.push(cat);
-    await updateTodo(todoId, { category_ids: [...byId(todoId).category_ids, cat.id] }, { drawer: true });
-  } catch (e) { toast('Aanmaken mislukt: ' + e.message); }
+    const g = await api('POST', `/api/${KINDS[kind].list}`, res);
+    state[KINDS[kind].list].push(g);
+    const patch = kind === 'category' ? { category_ids: [...t.category_ids, g.id] } : { [KINDS[kind].field]: g.id };
+    await updateTodo(todoId, patch, { drawer: true });
+    toast(`${KINDS[kind].title} “${g.name}” aangemaakt en gekoppeld`);
+  } catch (e) { toast('Aanmaken mislukt: ' + e.message); renderDrawer(); }
 }
 
 async function editGroup(kind, id) {
@@ -845,7 +854,7 @@ function bind() {
       const ids = byId(id).category_ids;
       return updateTodo(id, { category_ids: ids.includes(cid) ? ids.filter((x) => x !== cid) : [...ids, cid] }, { drawer: true });
     }
-    if (act === 'new-label') return newLabelFor(id);
+    if (act === 'new-label') return newGroupFor(id, 'category');
     const due = e.target.closest('[data-due]');
     if (due) return updateTodo(id, { due: due.dataset.due || null }, { drawer: true });
   });
@@ -870,7 +879,9 @@ function bind() {
   drawer.addEventListener('change', (e) => {
     const id = state.selected;
     if (e.target.id === 'dDue') updateTodo(id, { due: e.target.value || null }, { drawer: true });
-    const ref = { dClient: 'client_id', dProject: 'project_id' }[e.target.id];
+    const kind = { dClient: 'client', dProject: 'project' }[e.target.id];
+    if (kind && e.target.value === 'new') return newGroupFor(id, kind);
+    const ref = kind && KINDS[kind].field;
     if (ref) updateTodo(id, { [ref]: e.target.value ? Number(e.target.value) : null }, { drawer: true });
   });
 

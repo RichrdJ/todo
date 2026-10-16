@@ -4,6 +4,11 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-16
+
+### Toegevoegd
+- In het detailpaneel kun je via **+ Nieuwe klant…** en **+ Nieuw project…** direct een klant of project aanmaken en aan de taak koppelen; een nieuw project krijgt automatisch de klant van de taak
+
 ## [1.3.0] - 2026-10-16
 
 ### Toegevoegd
@@ -47,7 +52,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/RichrdJ/todo/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RichrdJ/todo/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/RichrdJ/todo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/RichrdJ/todo/compare/v1.0.0...v1.1.0
