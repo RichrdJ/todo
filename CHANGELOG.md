@@ -4,6 +4,12 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-10-16
+
+### Gewijzigd
+- Agenda: de knoppen rechtsboven (weken en navigatie) lijnen uit met de rechterrand van de taakbalk en de agenda
+- Agenda: de weeknavigatie staat in hetzelfde kader als de weekkeuze
+
 ## [1.4.2] - 2026-10-16
 
 ### Gewijzigd
@@ -83,7 +89,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/RichrdJ/todo/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/RichrdJ/todo/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/RichrdJ/todo/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/RichrdJ/todo/compare/v1.3.2...v1.4.0

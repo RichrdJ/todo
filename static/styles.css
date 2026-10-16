@@ -411,13 +411,17 @@ kbd {
 .view-tools:empty { display: none; }
 .seg.mini { display: inline-grid; grid-template-columns: repeat(3, auto); padding: 3px; }
 .seg.mini button { height: 28px; padding: 0 10px; font-size: 12.5px; }
-.nav-btns { display: flex; align-items: center; gap: 2px; }
+/* Same pill as the week toggle, so the header's right edge lines up visibly with the composer. */
+.nav-btns { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+.nav-btns .icon-btn { width: 28px; height: 28px; }
+.nav-btns .btn.small { height: 28px; border: 0; }
 .btn.small { height: 30px; padding: 0 10px; font-size: 12.5px; }
 .btn:disabled { opacity: .45; cursor: default; }
 
-/* --tray is the side column; the composer above the agenda stops where the calendar stops. */
+/* --tray is the side column; the header and composer above the agenda stop where the calendar stops. */
 .main.wide { --tray: 260px; --tray-gap: 18px; --wd-h: 20px; }
 .agenda { display: grid; grid-template-columns: minmax(0, 1fr) var(--tray); gap: var(--tray-gap); align-items: start; }
+.main.wide .topbar,
 .main.wide .composer {
   width: calc(min(100%, 1500px) - var(--tray) - var(--tray-gap));
   margin-left: max(0px, calc((100% - 1500px) / 2));
@@ -492,7 +496,7 @@ kbd {
 
 @media (max-width: 1400px) {
   .agenda { grid-template-columns: minmax(0, 1fr); }
-  .main.wide .composer { width: auto; margin-left: auto; margin-right: auto; }
+  .main.wide .topbar, .main.wide .composer { width: auto; margin-left: auto; margin-right: auto; }
   .tray { margin-top: 0; position: static; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
 }
 @media (max-width: 820px) {
