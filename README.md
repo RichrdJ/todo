@@ -30,7 +30,7 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 
 - Een taak heeft hooguit één klant en één project, maar zoveel categorieën als je wilt. Klik in het detailpaneel op een label om het aan of uit te zetten, of maak er direct een nieuwe aan met **+ Nieuw**.
 - Ook een nieuwe klant of nieuw project maak je direct vanuit het detailpaneel: kies **+ Nieuwe klant…** of **+ Nieuw project…** in de keuzelijst en het wordt meteen aan de taak gekoppeld.
-- Alleen klanten hebben een kleur; projecten en categorieën zijn neutraal, zodat de kleur altijd betekent: voor wie is dit.
+- Alleen klanten hebben een kleur; projecten en categorieën zijn neutraal, zodat de kleur altijd betekent: voor wie is dit Elke klant krijgt een eigen kleur: kleuren die al in gebruik zijn, zijn uitgegrijsd.
 - Kies je een project dat bij een klant hoort, dan krijgt de taak automatisch die klant. Kies je een andere klant, dan vervalt het project van de oude klant.
 - Projecten zonder klant (bijv. intern werk) staan in de zijbalk onder *Projecten*; projecten van een klant staan onder die klant.
 - De klantweergave groepeert taken per project. Een categorie loopt dwars door alle klanten heen, zodat je bijvoorbeeld al je overleggen bij elkaar ziet.

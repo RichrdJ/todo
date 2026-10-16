@@ -4,6 +4,13 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-16
+
+### Gewijzigd
+- Kleuren die al bij een andere klant horen zijn uitgegrijsd (met de klantnaam als tooltip), zodat elke klant een eigen kleur houdt
+- Een nieuwe klant krijgt automatisch de eerste vrije kleur
+- Palet uitgebreid van 10 naar 16 kleuren; zijn ze allemaal bezet, dan mag je er weer een dubbel kiezen
+
 ## [1.3.1] - 2026-10-16
 
 ### Toegevoegd
@@ -52,7 +59,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/RichrdJ/todo/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RichrdJ/todo/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RichrdJ/todo/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/RichrdJ/todo/compare/v1.1.0...v1.2.0

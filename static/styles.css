@@ -412,7 +412,12 @@ kbd {
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .dlg-label { display: block; margin: 14px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; padding: 0; box-shadow: inset 0 0 0 2px var(--panel-solid); }
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; padding: 0; background-color: var(--sw); box-shadow: inset 0 0 0 2px var(--panel-solid); }
+.swatch:disabled {
+  cursor: not-allowed; opacity: .3;
+  background-image: linear-gradient(135deg, transparent 44%, var(--panel-solid) 44% 56%, transparent 56%);
+}
+.modal .dlg-note { margin: 10px 0 0; font-size: 12.5px; color: var(--text-3); }
 .swatch.on { border-color: var(--text); }
 
 .scrim { display: none; }

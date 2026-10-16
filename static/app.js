@@ -69,7 +69,10 @@ const PRIOS = [
   { v: 2, label: 'Middel', color: 'var(--p2)' },
   { v: 3, label: 'Hoog', color: 'var(--p3)' },
 ];
-const COLORS = ['#7c5cff', '#3b82f6', '#06b6d4', '#22c55e', '#a3e635', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#94a3b8'];
+const COLORS = [
+  '#7c5cff', '#3b82f6', '#0ea5e9', '#06b6d4', '#14b8a6', '#22c55e', '#a3e635', '#eab308',
+  '#f59e0b', '#f97316', '#ef4444', '#f43f5e', '#ec4899', '#d946ef', '#a16207', '#94a3b8',
+];
 
 /* ---------- State ---------- */
 const state = {
@@ -584,7 +587,14 @@ function setView(view) {
 function groupDialog(kind, item, defaults = {}) {
   const K = KINDS[kind];
   return new Promise((resolve) => {
-    let color = item ? item.color : COLORS[state[K.list].length % COLORS.length];
+    // Colours other clients already use are greyed out, so every client stays recognisable.
+    // A client's own colour stays available; once the palette runs out, reuse is allowed again.
+    const taken = new Map(kind === 'client'
+      ? state.clients.filter((c) => !item || c.id !== item.id).map((c) => [c.color.toLowerCase(), c.name])
+      : []);
+    const exhausted = COLORS.every((c) => taken.has(c));
+    if (exhausted) taken.clear();
+    let color = item ? item.color : COLORS.find((c) => !taken.has(c)) || COLORS[0];
     const scope = currentScope();
     const clientId = item ? item.client_id
       : 'client_id' in defaults ? defaults.client_id
@@ -600,7 +610,10 @@ function groupDialog(kind, item, defaults = {}) {
             <option value="">Geen klant (intern)</option>
             ${options(state.clients, clientId)}
           </select>` : ''}
-        ${kind === 'client' ? `<div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch ${c === color ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Kleur ${c}"></button>`).join('')}</div>` : ''}
+        ${kind === 'client' ? `<div class="swatches">${COLORS.map((c) => taken.has(c)
+          ? `<button type="button" class="swatch" style="--sw:${c}" disabled title="In gebruik door ${esc(taken.get(c))}" aria-label="Kleur in gebruik door ${esc(taken.get(c))}"></button>`
+          : `<button type="button" class="swatch ${c === color ? 'on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Kleur ${c}"></button>`).join('')}</div>
+          ${exhausted ? '<p class="dlg-note">Alle kleuren zijn in gebruik, dus je kunt er een dubbel kiezen.</p>' : ''}` : ''}
         <div class="actions">
           <button type="button" class="btn ghost" data-act="cancel">Annuleren</button>
           <button type="submit" class="btn primary">${item ? 'Opslaan' : 'Aanmaken'}</button>
