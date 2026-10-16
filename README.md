@@ -1,8 +1,8 @@
-# Klaar ✓
+# ToDo ✓
 
 Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen externe afhankelijkheden, je data in één SQLite-bestand.
 
-![Klaar screenshot](docs/screenshot.jpg)
+![ToDo screenshot](docs/screenshot.jpg)
 
 ## Features
 
@@ -108,7 +108,7 @@ python3 server.py
 | `APP_USER`     | `admin`          | Gebruikersnaam bij wachtwoordbeveiliging        |
 | `TZ`           | —                | Tijdzone, bijv. `Europe/Amsterdam`              |
 
-Draai je Klaar buiten je eigen netwerk, zet dan een `APP_PASSWORD` én een reverse proxy met HTTPS (Caddy, Traefik, Nginx Proxy Manager) ervoor; basic auth zonder HTTPS stuurt het wachtwoord leesbaar mee.
+Draai je ToDo buiten je eigen netwerk, zet dan een `APP_PASSWORD` én een reverse proxy met HTTPS (Caddy, Traefik, Nginx Proxy Manager) ervoor; basic auth zonder HTTPS stuurt het wachtwoord leesbaar mee.
 
 ## Back-up
 

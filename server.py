@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Klaar — a small, self-hosted todo app for work.
+"""ToDo — a small, self-hosted todo app for work.
 
 Zero dependencies: only the Python standard library (http.server + sqlite3).
 Configuration via environment variables:
@@ -424,7 +424,7 @@ ROUTES = [(m, re.compile(p + r"/?$"), h) for m, p, h in ROUTES]
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Klaar"
+    server_version = "ToDo"
     store = None  # set in main()
 
     def log_message(self, fmt, *args):
@@ -479,7 +479,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "version": APP_VERSION})
         if not self.authorized():
             self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="Klaar", charset="UTF-8"')
+            self.send_header("WWW-Authenticate", 'Basic realm="ToDo", charset="UTF-8"')
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -530,7 +530,7 @@ def main():
     Handler.store = Store(DB_PATH)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     auth = "aan" if APP_PASSWORD else "uit"
-    print(f"Klaar {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, wachtwoord: {auth})", flush=True)
+    print(f"ToDo {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, wachtwoord: {auth})", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

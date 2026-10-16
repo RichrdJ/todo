@@ -109,13 +109,29 @@ kbd {
   overflow-y: auto;
   z-index: 30;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 12px; font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
-.logo {
-  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 6px 16px -6px var(--accent);
+.brand { display: flex; align-items: center; gap: 6px; padding: 0 2px 14px; }
+.brand-home {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px;
+  padding: 6px 8px 6px 6px; border: 0; border-radius: 12px; background: none; text-align: left;
+  transition: background .15s;
 }
-.logo svg { width: 22px; height: 22px; stroke-width: 0; }
+.brand-home:hover { background: var(--accent-soft); }
+.logo {
+  flex: none; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 18px -8px var(--accent);
+  transition: transform .2s cubic-bezier(.3, 1.6, .5, 1);
+}
+.brand-home:hover .logo { transform: rotate(-6deg) scale(1.04); }
+.logo svg { width: 24px; height: 24px; stroke-width: 0; }
+.brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.wordmark { font-size: 19px; font-weight: 800; letter-spacing: -.035em; color: var(--text); }
+.wordmark span {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand-sub { margin-top: 2px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub::first-letter { text-transform: uppercase; }
 .theme-toggle { margin-left: auto; }
 
 .search {

@@ -4,6 +4,12 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-16
+
+### Gewijzigd
+- De app heet nu **ToDo** (was Klaar), met een nieuw logo en de datum van vandaag onder de naam
+- Technische namen (volume `klaar-data`, databasebestand `klaar.db`, stacknaam) blijven hetzelfde, zodat bestaande data gewoon behouden blijft
+
 ## [1.4.0] - 2026-10-16
 
 ### Toegevoegd
@@ -71,7 +77,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/RichrdJ/todo/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/RichrdJ/todo/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/RichrdJ/todo/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RichrdJ/todo/compare/v1.3.0...v1.3.1

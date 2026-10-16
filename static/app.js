@@ -230,6 +230,7 @@ function renderSidebar() {
   const dark = document.documentElement.dataset.theme === 'dark'
     || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   $('#themeToggle').innerHTML = dark ? ICONS.sun : ICONS.moon;
+  $('#brandDate').textContent = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function viewGroups() {
@@ -442,7 +443,7 @@ function renderHeader() {
   const scope = currentScope();
   const title = state.search ? 'Zoekresultaten' : scope ? scope.item.name : VIEWS[state.view].title;
   $('#viewTitle').textContent = title;
-  document.title = `${title} · Klaar`;
+  document.title = `${title} · ToDo`;
 
   let sub = '';
   const progress = $('#progress');
@@ -921,7 +922,7 @@ function bind() {
     if (nav) state.agendaOffset = Number(nav.dataset.agenda) === 0 ? 0 : state.agendaOffset + Number(nav.dataset.agenda);
     if (weeks || nav) { renderHeader(); renderList(); }
   });
-  $('.brand').addEventListener('click', (e) => { if (!e.target.closest('#themeToggle')) { state.agendaOffset = 0; setView('agenda'); } });
+  $('#brandHome').addEventListener('click', () => { state.agendaOffset = 0; setView('agenda'); });
 
   const list = $('#listWrap');
   list.addEventListener('click', (e) => {
