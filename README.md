@@ -16,8 +16,9 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
   - `#naam` voor een klant of project, `+naam` voor een categorie; meerdere `+` mag (begin van de naam is genoeg)
 - **Detailpaneel** met notities, deadline, prioriteit, klant, project en categorie-labels (slaat automatisch op)
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
+- **Dupliceren** van een taak (knop in de lijst of het detailpaneel, of `⌘D` / `Ctrl+D`): de kopie opent meteen met de naam geselecteerd, zodat je hem direct kunt hernoemen
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
-- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `1`–`6` wissel weergave, `Esc` sluiten
+- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `Esc` sluiten
 - JSON-export via de zijbalk
 - Optioneel wachtwoord (HTTP basic auth)
 

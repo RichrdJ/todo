@@ -61,6 +61,7 @@ const ICONS = {
   grid: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M9 9v12M15 9v12M3 15h18"/></svg>',
   left: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="3"/><path d="M16 8V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h2"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
   folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
@@ -324,7 +325,8 @@ function renderTodo(t, sortable) {
         <div class="title">${esc(t.title)}</div>
         <div class="meta">${meta.join('')}</div>
       </div>
-      <button class="icon-btn del danger" data-act="delete" aria-label="Verwijderen" title="Verwijderen">${ICONS.trash}</button>
+      <button class="icon-btn row-act" data-act="duplicate" aria-label="Dupliceren" title="Dupliceren">${ICONS.copy}</button>
+      <button class="icon-btn row-act danger" data-act="delete" aria-label="Verwijderen" title="Verwijderen">${ICONS.trash}</button>
     </li>`;
 }
 
@@ -497,6 +499,7 @@ function renderDrawer() {
       <div class="drawer-top">
         <button class="btn ghost" data-act="toggle">${t.done ? 'Heropenen' : 'Markeer als klaar'}</button>
         <span class="spacer"></span>
+        <button class="icon-btn" data-act="duplicate" title="Dupliceren (${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl+'}D)" aria-label="Dupliceren">${ICONS.copy}</button>
         <button class="icon-btn danger" data-act="delete" title="Verwijderen" aria-label="Verwijderen">${ICONS.trash}</button>
         <button class="icon-btn" data-act="close" title="Sluiten (Esc)" aria-label="Sluiten">${ICONS.x}</button>
       </div>
@@ -617,6 +620,23 @@ async function toggleTodo(id) {
   t.completed_at = done ? new Date().toISOString() : null;
   await updateTodo(id, { done }, { drawer: state.selected === id });
   if (done) toast('Taak afgerond', 'Ongedaan maken', () => updateTodo(id, { done: false }, { drawer: state.selected === id }));
+}
+
+/* Copy a task (open, right below the original) and open the copy with its title selected for renaming. */
+async function duplicateTodo(id) {
+  const t = byId(id);
+  if (!t) return;
+  const { title, notes, priority, due, client_id, project_id, category_ids, position } = t;
+  try {
+    const copy = await api('POST', '/api/todos', { title, notes, priority, due, client_id, project_id, category_ids, position: position + 0.001 });
+    replaceTodo(copy);
+    state.selected = copy.id;
+    render();
+    const input = $('#dTitle');
+    input.focus();
+    input.select();
+    toast('Taak gedupliceerd', 'Ongedaan maken', () => deleteTodo(copy.id));
+  } catch (e) { toast('Dupliceren mislukt: ' + e.message); }
 }
 
 async function deleteTodo(id) {
@@ -941,6 +961,7 @@ function bind() {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'toggle') return toggleTodo(id);
     if (act === 'delete') return deleteTodo(id);
+    if (act === 'duplicate') return duplicateTodo(id);
     state.selected = state.selected === id ? null : id;
     renderList();
     renderDrawer();
@@ -1018,6 +1039,7 @@ function bind() {
     if (act === 'close') { state.selected = null; renderList(); return renderDrawer(); }
     if (act === 'toggle') return toggleTodo(id);
     if (act === 'delete') return deleteTodo(id);
+    if (act === 'duplicate') return duplicateTodo(id);
     const prio = e.target.closest('[data-prio]');
     if (prio) return updateTodo(id, { priority: Number(prio.dataset.prio) }, { drawer: true });
     const label = e.target.closest('[data-label]');
@@ -1078,6 +1100,7 @@ function bind() {
     }
     if (typing || e.metaKey || e.ctrlKey || e.altKey) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#search').focus(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && state.selected) { e.preventDefault(); duplicateTodo(state.selected); }
       return;
     }
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); $('#newTitle').focus(); }

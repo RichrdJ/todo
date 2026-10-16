@@ -4,6 +4,12 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-16
+
+### Toegevoegd
+- Taken dupliceren via de knop in de lijst, in het detailpaneel of met `⌘D` / `Ctrl+D`
+- De kopie komt direct onder het origineel, met dezelfde deadline, prioriteit, klant, project, labels en notities, en opent meteen met de naam geselecteerd om te hernoemen
+
 ## [1.4.3] - 2026-10-16
 
 ### Gewijzigd
@@ -89,7 +95,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/RichrdJ/todo/compare/v1.4.3...v1.5.0
 [1.4.3]: https://github.com/RichrdJ/todo/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/RichrdJ/todo/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/RichrdJ/todo/compare/v1.4.0...v1.4.1

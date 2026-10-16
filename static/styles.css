@@ -333,8 +333,9 @@ kbd {
 }
 .meta .due.today { color: var(--accent); font-weight: 600; }
 .meta .due.overdue { color: var(--danger); font-weight: 600; }
-.todo .del { opacity: 0; margin: -4px 0; }
-.todo:hover .del, .todo .del:focus-visible { opacity: 1; }
+.todo .row-act { opacity: 0; margin: -4px 0; }
+.todo:hover .row-act, .todo .row-act:focus-visible { opacity: 1; }
+.todo .row-act + .row-act { margin-left: -8px; }
 
 .empty { text-align: center; padding: 60px 20px; color: var(--text-2); }
 .empty .art {
@@ -561,7 +562,7 @@ kbd {
   .composer .btn { display: none; }
   .drawer.open { width: 100%; }
   .drawer-inner { width: 100%; }
-  .todo .del { opacity: 1; }
+  .todo .row-act { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
