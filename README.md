@@ -25,8 +25,8 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 ### Docker Compose (aanbevolen)
 
 ```bash
-git clone https://github.com/<jouw-gebruiker>/klaar.git
-cd klaar
+git clone https://github.com/RichrdJ/todo.git
+cd todo
 docker compose up -d
 ```
 
@@ -44,7 +44,7 @@ docker run -d --name klaar -p 8080:8080 -v klaar-data:/data --restart unless-sto
 Bij elke push naar `main` bouwt GitHub Actions een multi-arch image (amd64 + arm64, dus ook voor een Raspberry Pi of Synology):
 
 ```bash
-docker run -d --name klaar -p 8080:8080 -v klaar-data:/data ghcr.io/<jouw-gebruiker>/klaar:latest
+docker run -d --name klaar -p 8080:8080 -v klaar-data:/data ghcr.io/richrdj/todo:latest
 ```
 
 > Is de repo privé, dan is de package dat ook. Log dan eerst in met `docker login ghcr.io`, of zet de package op public in GitHub onder *Packages → Package settings*.
