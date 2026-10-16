@@ -6,7 +6,7 @@ services:
     container_name: klaar
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "6060:6060"
     volumes:
       - klaar-data:/data
     environment:

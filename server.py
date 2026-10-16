@@ -4,7 +4,7 @@
 Zero dependencies: only the Python standard library (http.server + sqlite3).
 Configuration via environment variables:
 
-  PORT          port to listen on              (default 8080)
+  PORT          port to listen on              (default 6060)
   DB_PATH       path to the SQLite database    (default data/klaar.db)
   APP_PASSWORD  enables HTTP basic auth when set
   APP_USER      basic auth username            (default "admin")
@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-PORT = int(os.environ.get("PORT", "8080"))
+PORT = int(os.environ.get("PORT", "6060"))
 DB_PATH = os.environ.get("DB_PATH", "data/klaar.db")
 APP_USER = os.environ.get("APP_USER", "admin")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")

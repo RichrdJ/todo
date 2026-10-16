@@ -68,12 +68,12 @@ cd todo
 docker compose up -d
 ```
 
-Open daarna <http://localhost:8080>. Dit bouwt de image lokaal; wil je de kant-en-klare image, vervang dan in `docker-compose.yml` de regel `build: .` door `image: ghcr.io/richrdj/todo:latest`.
+Open daarna <http://localhost:6060>. Dit bouwt de image lokaal; wil je de kant-en-klare image, vervang dan in `docker-compose.yml` de regel `build: .` door `image: ghcr.io/richrdj/todo:latest`.
 
 ### Alleen Docker
 
 ```bash
-docker run -d --name klaar -p 8080:8080 -v klaar-data:/data --restart unless-stopped ghcr.io/richrdj/todo:latest
+docker run -d --name klaar -p 6060:6060 -v klaar-data:/data --restart unless-stopped ghcr.io/richrdj/todo:latest
 ```
 
 ### Zonder Docker
@@ -88,7 +88,7 @@ python3 server.py
 
 | Variabele      | Standaard        | Uitleg                                          |
 | -------------- | ---------------- | ----------------------------------------------- |
-| `PORT`         | `8080`           | Poort waarop de server luistert                 |
+| `PORT`         | `6060`           | Poort waarop de server luistert                 |
 | `DB_PATH`      | `/data/klaar.db` | Locatie van de SQLite-database                  |
 | `APP_PASSWORD` | _(leeg)_         | Zet dit om de app met een wachtwoord te beveiligen |
 | `APP_USER`     | `admin`          | Gebruikersnaam bij wachtwoordbeveiliging        |

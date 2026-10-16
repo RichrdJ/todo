@@ -4,6 +4,11 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-16
+
+### Gewijzigd
+- Standaardpoort is nu **6060** (was 8080). Gebruik je een eigen stack- of compose-bestand met `8080:8080`, verander dat dan in `6060:6060` (of `8080:6060` om de oude poort aan de buitenkant te houden).
+
 ## [1.1.0] - 2026-10-16
 
 ### Toegevoegd
@@ -30,6 +35,7 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/RichrdJ/todo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/RichrdJ/todo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/RichrdJ/todo/releases/tag/v1.0.0

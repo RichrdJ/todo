@@ -3,7 +3,7 @@ FROM python:3.13-alpine
 ARG VERSION=dev
 
 ENV PYTHONUNBUFFERED=1 \
-    PORT=8080 \
+    PORT=6060 \
     DB_PATH=/data/klaar.db \
     APP_VERSION=${VERSION}
 
@@ -15,7 +15,7 @@ COPY static ./static
 
 USER klaar
 VOLUME ["/data"]
-EXPOSE 8080
+EXPOSE 6060
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" >/dev/null || exit 1
