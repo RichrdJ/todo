@@ -4,6 +4,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-19
+
 ### Toegevoegd
 - Zijbalk versleepbaar: sleep de rand om hem breder of smaller te maken (220–440 px), dubbelklik voor de standaardbreedte; ook met de pijltjestoetsen op de rand
 - Zijbalk inklappen met het pijltje op de rand, door hem dicht te slepen of met `[`; de menuknop linksboven klapt hem weer uit. Breedte en stand worden per apparaat onthouden
@@ -129,7 +131,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/RichrdJ/todo/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/RichrdJ/todo/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/RichrdJ/todo/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RichrdJ/todo/compare/v1.4.3...v1.5.0
