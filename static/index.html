@@ -9,7 +9,12 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/styles.css">
   <script>
-    try { const t = localStorage.getItem('klaar.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+    try {
+      const root = document.documentElement;
+      const t = localStorage.getItem('klaar.theme'); if (t) root.dataset.theme = t;
+      const w = Number(localStorage.getItem('klaar.sidebarW')); if (w >= 220 && w <= 440) root.style.setProperty('--sidebar-w', w + 'px');
+      if (localStorage.getItem('klaar.sidebar') === 'collapsed') root.classList.add('sidebar-collapsed');
+    } catch {}
   </script>
 </head>
 <body>
@@ -68,10 +73,17 @@
         <a href="/api/export" class="foot-link" title="Download al je taken als JSON">
           <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>Export
         </a>
-        <span class="shortcuts" title="N nieuw · / zoeken · 1–6 weergave · , instellingen"><kbd>N</kbd> nieuw · <kbd>1</kbd>–<kbd>6</kbd></span>
+        <span class="shortcuts" title="N nieuw · / zoeken · 1–6 weergave · , instellingen · [ zijbalk"><kbd>N</kbd> nieuw · <kbd>1</kbd>–<kbd>6</kbd></span>
         <a class="version" id="version" href="https://github.com/RichrdJ/todo/releases" target="_blank" rel="noopener"></a>
       </div>
     </aside>
+
+    <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Breedte zijbalk" aria-controls="sidebar" tabindex="0"
+         title="Sleep om de breedte te wijzigen · dubbelklik voor standaard">
+      <button class="sidebar-collapse" id="sidebarCollapse" title="Zijbalk inklappen ([)" aria-label="Zijbalk inklappen">
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+    </div>
 
     <div class="scrim" id="scrim"></div>
 

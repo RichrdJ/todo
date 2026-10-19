@@ -2,7 +2,11 @@
 
 Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen externe afhankelijkheden, je data in één SQLite-bestand.
 
-![ToDo screenshot](docs/screenshot.jpg)
+![De agenda van ToDo in het donkere thema](docs/screenshot.jpg)
+
+| Vandaag met het detailpaneel | Instellingen | Inloggen |
+| --- | --- | --- |
+| ![Vandaag-weergave met het detailpaneel open, licht thema](docs/vandaag.jpg) | ![Instellingen: thema, startpagina, agenda en inloggen](docs/instellingen.jpg) | ![Inlogpagina](docs/inloggen.jpg) |
 
 ## Features
 
@@ -19,7 +23,8 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - **Dupliceren** van een taak (knop in de lijst of het detailpaneel, of `⌘D` / `Ctrl+D`): de kopie opent meteen met de naam geselecteerd, zodat je hem direct kunt hernoemen
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
-- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `,` instellingen, `Esc` sluiten
+- **Zijbalk naar wens**: sleep de rand om hem breder of smaller te maken (dubbelklik zet hem terug), en klap hem in met het pijltje op de rand, door hem dicht te slepen of met `[`
+- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `,` instellingen, `[` zijbalk in-/uitklappen, `Esc` sluiten
 - JSON-export via de zijbalk
 - **Instellingen** (tandwiel in de zijbalk): thema, startpagina, aantal agendaweken, weekend en afgeronde taken in de agenda, en inloggen
 - **Inlogpagina** met "ingelogd blijven", versleuteld opgeslagen wachtwoord en bescherming tegen raden (optioneel, aan te zetten in de instellingen)
