@@ -4,6 +4,17 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+### Toegevoegd
+- Instellingen (tandwiel in de zijbalk, of `,`): thema licht/donker/systeem, startpagina, aantal agendaweken, weekend en afgeronde taken in de agenda aan/uit
+- Inloggen aan- en uitzetten in de instellingen, met gebruikersnaam en wachtwoord (versleuteld in de database); geen stack-variabele meer nodig
+- Wachtwoord wijzigen in de app; dat vraagt om je huidige wachtwoord en logt andere apparaten uit
+- *Andere apparaten uitloggen* in de instellingen
+- `python server.py reset-login` als je het wachtwoord uit de app kwijt bent
+
+### Gewijzigd
+- `APP_PASSWORD_HASH` / `APP_PASSWORD` werken zoals voorheen en gaan vóór een wachtwoord uit de app
+- Het logo brengt je naar je gekozen startpagina (standaard de agenda)
+
 ## [1.6.0] - 2026-10-16
 
 ### Toegevoegd

@@ -19,9 +19,10 @@ Een strakke, self-hosted todo-app voor werk. Eén kleine Docker-container, geen 
 - Voortgangsring voor vandaag, afvinken met ongedaan maken, slepen om te sorteren
 - **Dupliceren** van een taak (knop in de lijst of het detailpaneel, of `⌘D` / `Ctrl+D`): de kopie opent meteen met de naam geselecteerd, zodat je hem direct kunt hernoemen
 - Licht/donker thema, werkt op mobiel en is als app te installeren (PWA)
-- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `Esc` sluiten
+- Sneltoetsen: `N` nieuwe taak, `/` of `⌘K` zoeken, `⌘D` dupliceren, `1`–`6` wissel weergave, `,` instellingen, `Esc` sluiten
 - JSON-export via de zijbalk
-- **Inlogpagina** met "ingelogd blijven", versleuteld opgeslagen wachtwoord en bescherming tegen raden (optioneel)
+- **Instellingen** (tandwiel in de zijbalk): thema, startpagina, aantal agendaweken, weekend en afgeronde taken in de agenda, en inloggen
+- **Inlogpagina** met "ingelogd blijven", versleuteld opgeslagen wachtwoord en bescherming tegen raden (optioneel, aan te zetten in de instellingen)
 
 ## Agenda
 
@@ -32,7 +33,8 @@ De startpagina is een agenda van de komende weken (maandag t/m zondag), te wisse
 - Met de **+** bij een dag maak je meteen een taak op die dag (`#klant`, `+label` en `!hoog` werken ook hier).
 - Naast (of op smalle schermen boven) de agenda staan **Te laat** en **Nog inplannen**: taken zonder datum. Sleep ze naar een dag om ze in te plannen, of sleep een taak terug naar *Nog inplannen* om de datum weg te halen.
 - Op dagen in het verleden zie je wat je hebt afgerond; wat nog open staat, staat onder *Te laat*.
-- Klik op het logo om altijd terug te gaan naar de agenda.
+- Klik op het logo om altijd terug te gaan naar de agenda (of de startpagina die je in de instellingen kiest).
+- In de instellingen kun je het weekend verbergen; staat er een taak op zaterdag of zondag, dan zie je die dagen toch.
 
 ## Klanten, projecten en categorieën
 
@@ -106,8 +108,8 @@ python3 server.py
 | ------------------- | ---------------- | ------------------------------------------------------------- |
 | `PORT`              | `6060`           | Poort waarop de server luistert                               |
 | `DB_PATH`           | `/data/klaar.db` | Locatie van de SQLite-database                                |
-| `APP_USER`          | `admin`          | Gebruikersnaam om in te loggen                                |
-| `APP_PASSWORD_HASH` | _(leeg)_         | Versleuteld wachtwoord (aanbevolen), zie hieronder            |
+| `APP_USER`          | `admin`          | Gebruikersnaam bij `APP_PASSWORD_HASH` / `APP_PASSWORD`       |
+| `APP_PASSWORD_HASH` | _(leeg)_         | Versleuteld wachtwoord, zie hieronder (of stel het in de app in) |
 | `APP_PASSWORD`      | _(leeg)_         | Wachtwoord als gewone tekst (eenvoudiger, minder veilig)      |
 | `SESSION_DAYS`      | `30`             | Hoe lang *ingelogd blijven* geldt                             |
 | `COOKIE_SECURE`     | `auto`           | `true` / `false` / `auto` (auto: alleen achter een HTTPS-proxy) |
@@ -115,9 +117,21 @@ python3 server.py
 
 ## Inloggen
 
-Zonder wachtwoord opent de app direct. Zet je `APP_PASSWORD_HASH` (of `APP_PASSWORD`), dan krijg je een inlogpagina.
+Zonder wachtwoord opent de app direct. Een inlogpagina zet je op een van twee manieren aan:
 
-**Versleuteld wachtwoord maken:**
+**In de app (het makkelijkst):** open **Instellingen** (tandwiel in de zijbalk, of `,`), zet *Inloggen vereist* aan en kies een gebruikersnaam en wachtwoord. Het wachtwoord wordt versleuteld in de database opgeslagen. Wijzigen of uitzetten kan daar ook; dat vraagt om je huidige wachtwoord en logt je andere apparaten uit.
+
+Wachtwoord vergeten? Zet het inloggen dan uit vanaf de server en stel daarna in de app een nieuw wachtwoord in:
+
+```bash
+docker exec klaar python server.py reset-login
+```
+
+(Bij een stack heet de container anders; zoek hem op met `docker ps`.)
+
+**Via je stack- of compose-bestand:** zet `APP_PASSWORD_HASH` (of `APP_PASSWORD`). Dat gaat altijd vóór een wachtwoord uit de app; in de instellingen zie je dan alleen dat het zo is ingesteld.
+
+Versleuteld wachtwoord maken:
 
 ```bash
 docker run --rm -it ghcr.io/richrdj/todo:latest python server.py hash-password
@@ -127,7 +141,7 @@ Dit vraagt twee keer je wachtwoord en geeft een regel als `APP_PASSWORD_HASH: "p
 
 - **Ingelogd blijven** houdt je `SESSION_DAYS` dagen ingelogd; zonder dat vinkje eindigt de sessie als je de browser sluit (en na uiterlijk 12 uur).
 - Na **5 foute pogingen** in 15 minuten wordt inloggen vanaf dat adres een kwartier geblokkeerd.
-- **Uitloggen** via het icoon rechtsboven in de zijbalk.
+- **Uitloggen** via het icoon rechtsboven in de zijbalk; *Andere apparaten uitloggen* staat in de instellingen.
 - Scripts kunnen de API nog steeds met basic auth gebruiken (`curl -u gebruiker:wachtwoord …`).
 
 Draai je ToDo buiten je eigen netwerk, zet er dan een reverse proxy met HTTPS voor (Caddy, Traefik, Nginx Proxy Manager). De inlogcookie wordt dan automatisch alleen over HTTPS verstuurd.
@@ -157,6 +171,9 @@ Of download een JSON-export via **Export** onderin de zijbalk.
 | `POST` `PATCH` `DELETE` | `/api/clients[/:id]` | Klanten, net als projecten |
 | `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | Categorieën, net als projecten |
 | `GET`    | `/api/export`           | JSON-export                       |
+| `POST`   | `/api/auth`             | Inlog instellen of wijzigen (`{"username", "password", "current_password"}`) |
+| `DELETE` | `/api/auth`             | Inloggen uitzetten (`{"current_password"}`) |
+| `DELETE` | `/api/sessions/others`  | Alle andere sessies uitloggen     |
 | `GET`    | `/api/health`           | Healthcheck (zonder auth)         |
 
 ## Releases
