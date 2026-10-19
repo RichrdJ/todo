@@ -4,6 +4,14 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+### Toegevoegd
+- Zijbalk versleepbaar: sleep de rand om hem breder of smaller te maken (220–440 px), dubbelklik voor de standaardbreedte; ook met de pijltjestoetsen op de rand
+- Zijbalk inklappen met het pijltje op de rand, door hem dicht te slepen of met `[`; de menuknop linksboven klapt hem weer uit. Breedte en stand worden per apparaat onthouden
+
+### Gewijzigd
+- De datum onder het logo valt niet meer weg naast de knoppen voor instellingen, thema en uitloggen
+- Nieuwe screenshots in de README
+
 ## [1.7.0] - 2026-10-19
 
 ### Toegevoegd

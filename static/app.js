@@ -1103,6 +1103,67 @@ function settingsDialog() {
   $('[data-act="close"]', modal).focus();
 }
 
+/* ---------- Sidebar width & collapse (per device) ---------- */
+const SIDEBAR = { min: 220, max: 440, collapseBelow: 140 };
+const isDesktop = () => !matchMedia('(max-width: 820px)').matches; // below that the sidebar is a slide-over menu
+const sidebarCollapsed = () => document.documentElement.classList.contains('sidebar-collapsed');
+
+function setSidebarCollapsed(on) {
+  document.documentElement.classList.toggle('sidebar-collapsed', on);
+  store.set('sidebar', on ? 'collapsed' : '');
+  $('#menuBtn').title = on ? 'Zijbalk tonen ([)' : '';
+  $('#menuBtn').setAttribute('aria-label', on ? 'Zijbalk tonen' : 'Menu');
+}
+
+function setSidebarWidth(w) {
+  const root = document.documentElement;
+  if (w == null) {
+    root.style.removeProperty('--sidebar-w');
+    store.set('sidebarW', '');
+  } else {
+    w = Math.round(Math.min(SIDEBAR.max, Math.max(SIDEBAR.min, w)));
+    root.style.setProperty('--sidebar-w', w + 'px');
+    store.set('sidebarW', w);
+  }
+  $('#sidebarResizer').setAttribute('aria-valuenow', Math.round($('#sidebar').getBoundingClientRect().width));
+}
+
+/* Drag the sidebar's edge to resize it; dragging it (almost) shut collapses it. Double-click resets the width. */
+function bindSidebarResize() {
+  const handle = $('#sidebarResizer');
+  handle.setAttribute('aria-valuemin', SIDEBAR.min);
+  handle.setAttribute('aria-valuemax', SIDEBAR.max);
+  handle.setAttribute('aria-valuenow', Math.round($('#sidebar').getBoundingClientRect().width));
+  $('#menuBtn').title = sidebarCollapsed() ? 'Zijbalk tonen ([)' : '';
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('#sidebarCollapse')) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add('resizing');
+    const { left, width: startWidth } = $('#sidebar').getBoundingClientRect();
+    const stop = () => {
+      document.body.classList.remove('resizing');
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('lostpointercapture', stop);
+    };
+    const move = (ev) => {
+      const w = ev.clientX - left;
+      // Collapsing keeps the width from before the drag, so the sidebar reopens as it was.
+      if (w < SIDEBAR.collapseBelow) { stop(); setSidebarWidth(startWidth); setSidebarCollapsed(true); return; }
+      setSidebarWidth(w);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('lostpointercapture', stop);
+  });
+  handle.addEventListener('dblclick', (e) => { if (!e.target.closest('#sidebarCollapse')) setSidebarWidth(null); });
+  handle.addEventListener('keydown', (e) => {
+    const w = $('#sidebar').getBoundingClientRect().width;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setSidebarWidth(w + (e.key === 'ArrowRight' ? 16 : -16)); }
+    if (e.key === 'Enter') { e.preventDefault(); setSidebarCollapsed(true); $('#menuBtn').focus(); }
+  });
+}
+
 /* ---------- Toast ---------- */
 let toastTimer;
 function toast(msg, actionLabel, action) {
@@ -1342,7 +1403,12 @@ function bind() {
     location.href = '/login';
   });
 
-  $('#menuBtn').addEventListener('click', () => document.body.classList.add('nav-open'));
+  $('#menuBtn').addEventListener('click', () => {
+    if (isDesktop() && sidebarCollapsed()) return setSidebarCollapsed(false);
+    document.body.classList.add('nav-open');
+  });
+  $('#sidebarCollapse').addEventListener('click', () => { setSidebarCollapsed(true); $('#menuBtn').focus(); });
+  bindSidebarResize();
   $('#scrim').addEventListener('click', () => document.body.classList.remove('nav-open'));
 
   document.addEventListener('keydown', (e) => {
@@ -1361,6 +1427,7 @@ function bind() {
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); $('#newTitle').focus(); }
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === ',') { e.preventDefault(); settingsDialog(); }
+    else if (e.key === '[' && isDesktop()) { e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed()); }
     else {
       const view = Object.entries(VIEWS).find(([, v]) => v.key === e.key);
       if (view) setView(view[0]);
