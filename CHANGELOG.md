@@ -4,6 +4,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-19
+
 ### Toegevoegd
 - Instellingen (tandwiel in de zijbalk, of `,`): thema licht/donker/systeem, startpagina, aantal agendaweken, weekend en afgeronde taken in de agenda aan/uit
 - Inloggen aan- en uitzetten in de instellingen, met gebruikersnaam en wachtwoord (versleuteld in de database); geen stack-variabele meer nodig
@@ -119,7 +121,8 @@ Alle noemenswaardige wijzigingen per versie. Formaat volgens [Keep a Changelog](
 - Docker-image op ghcr.io, `docker-compose.yml` en `stack.yml` voor Docker Swarm / Portainer
 - Versienummer in de app en in `/api/health`
 
-[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/RichrdJ/todo/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/RichrdJ/todo/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/RichrdJ/todo/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RichrdJ/todo/compare/v1.4.3...v1.5.0
 [1.4.3]: https://github.com/RichrdJ/todo/compare/v1.4.2...v1.4.3
