@@ -16,12 +16,15 @@
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <button class="brand-home" id="brandHome" title="Naar de agenda">
+        <button class="brand-home" id="brandHome" title="Naar je startpagina">
           <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8.5 13.5l4 4L23.5 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 24h14" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/></svg></span>
           <span class="brand-text">
             <span class="wordmark">To<span>Do</span></span>
             <span class="brand-sub" id="brandDate"></span>
           </span>
+        </button>
+        <button class="icon-btn" id="settingsBtn" title="Instellingen (,)" aria-label="Instellingen">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
         <button class="icon-btn theme-toggle" id="themeToggle" title="Thema wisselen" aria-label="Thema wisselen"></button>
         <button class="icon-btn" id="logoutBtn" title="Uitloggen" aria-label="Uitloggen" hidden>
@@ -65,7 +68,7 @@
         <a href="/api/export" class="foot-link" title="Download al je taken als JSON">
           <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>Export
         </a>
-        <span class="shortcuts" title="N nieuw · / zoeken · 1–6 weergave"><kbd>N</kbd> nieuw · <kbd>1</kbd>–<kbd>6</kbd></span>
+        <span class="shortcuts" title="N nieuw · / zoeken · 1–6 weergave · , instellingen"><kbd>N</kbd> nieuw · <kbd>1</kbd>–<kbd>6</kbd></span>
         <a class="version" id="version" href="https://github.com/RichrdJ/todo/releases" target="_blank" rel="noopener"></a>
       </div>
     </aside>

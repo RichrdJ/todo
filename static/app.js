@@ -96,6 +96,7 @@ const state = {
   search: '',
   selected: null,
   collapsed: new Set(JSON.parse(store.get('collapsed') || '[]')),
+  auth: {}, // { enabled, user, source: 'env' | 'app' | null } from /api/state
 };
 const byId = (id) => state.todos.find((t) => t.id === id);
 const projectById = (id) => state.projects.find((p) => p.id === id);
@@ -121,6 +122,16 @@ const VIEWS = {
   important: { title: 'Belangrijk', icon: ICONS.flag, key: '5', filter: (t) => !t.done && t.priority === 3 },
   done: { title: 'Voltooid', icon: ICONS.checkCircle, key: '6', filter: (t) => t.done },
 };
+
+/* Display preferences, kept per device like the theme and week count. */
+const START_VIEWS = ['agenda', 'today', 'upcoming', 'all', 'important'];
+const prefs = {
+  get theme() { return store.get('theme') || 'system'; },
+  get start() { const v = store.get('start'); return START_VIEWS.includes(v) ? v : 'agenda'; },
+  get weekend() { return store.get('weekend') !== '0'; },
+  get agendaDone() { return store.get('agendaDone') !== '0'; },
+};
+state.view = prefs.start;
 
 /* The client, project or category whose view is open, if any. */
 function currentScope() {
@@ -377,15 +388,19 @@ function renderAgenda() {
   const byDay = new Map(days.map((d) => [d, []]));
   for (const t of state.todos) if (t.due && byDay.has(t.due)) byDay.get(t.due).push(t);
 
-  const weekdays = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
-  let html = '<div class="agenda"><div class="cal">';
+  // With the weekend switched off, Saturday and Sunday still show up when a task is planned on one.
+  const weekend = prefs.weekend
+    || days.some((d, i) => i % 7 > 4 && d >= t0 && byDay.get(d).some((t) => !t.done));
+  const weekdays = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].slice(0, weekend ? 7 : 5);
+  let html = `<div class="agenda"><div class="cal ${weekend ? '' : 'no-weekend'}">`;
   html += weekdays.map((w, i) => `<div class="cal-wd ${i > 4 ? 'weekend' : ''}">${w}</div>`).join('');
   days.forEach((d, i) => {
+    if (!weekend && i % 7 > 4) return;
     const date = parseYmd(d);
     const items = byDay.get(d);
     // Open tasks from past days live in the "Te laat" tray, so past days only show what got done.
     const open = d < t0 ? [] : items.filter((t) => !t.done).sort(posSort);
-    const done = items.filter((t) => t.done);
+    const done = prefs.agendaDone ? items.filter((t) => t.done) : [];
     const month = i === 0 || date.getDate() === 1 ? date.toLocaleDateString('nl-NL', { month: 'short' }) : '';
     html += `
       <div class="day ${d === t0 ? 'is-today' : ''} ${d < t0 ? 'is-past' : ''} ${i % 7 > 4 ? 'weekend' : ''}" data-date="${d}">
@@ -933,6 +948,161 @@ async function deleteGroup(kind, id) {
   } catch (e) { toast('Verwijderen mislukt: ' + e.message); }
 }
 
+/* ---------- Settings ---------- */
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
+  else delete root.dataset.theme;
+  store.set('theme', theme === 'system' ? '' : theme);
+  renderSidebar();
+}
+
+const switchRow = (pref, title, hint, on) => `
+  <label class="set-row">
+    <span class="set-label"><b>${title}</b><span>${hint}</span></span>
+    <input type="checkbox" role="switch" class="switch" data-pref="${pref}" aria-label="${title}" ${on ? 'checked' : ''}>
+  </label>`;
+
+function settingsDialog() {
+  const modal = $('#modal');
+  let mode = null; // the open login form: 'setup', 'change' or 'off'
+  const seg = (pref, options, current) => `<div class="seg mini" data-seg="${pref}" style="grid-template-columns:repeat(${options.length}, auto)">${options.map(([v, label]) =>
+    `<button type="button" class="${String(current) === String(v) ? 'on' : ''}" data-value="${v}">${label}</button>`).join('')}</div>`;
+  modal.innerHTML = `
+    <div class="box settings" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+      <div class="set-head">
+        <h3 id="setTitle">Instellingen</h3>
+        <button class="icon-btn" data-act="close" title="Sluiten (Esc)" aria-label="Sluiten">${ICONS.x}</button>
+      </div>
+      <section class="set-sec">
+        <h4>Weergave</h4>
+        <div class="set-row">
+          <span class="set-label"><b>Thema</b></span>
+          ${seg('theme', [['light', 'Licht'], ['dark', 'Donker'], ['system', 'Systeem']], prefs.theme)}
+        </div>
+        <div class="set-row">
+          <label class="set-label" for="setStart"><b>Startpagina</b><span>Hier opent de app, en hier brengt het logo je heen</span></label>
+          <select class="input" id="setStart">${START_VIEWS.map((v) => `<option value="${v}" ${prefs.start === v ? 'selected' : ''}>${VIEWS[v].title}</option>`).join('')}</select>
+        </div>
+        <div class="set-row">
+          <span class="set-label"><b>Agenda</b><span>Aantal weken dat je ziet</span></span>
+          ${seg('weeks', [[2, '2 wk'], [3, '3 wk'], [4, '4 wk']], state.agendaWeeks)}
+        </div>
+        ${switchRow('weekend', 'Weekend in de agenda', 'Zaterdag en zondag; staat er een taak op, dan zie je ze altijd', prefs.weekend)}
+        ${switchRow('agendaDone', 'Afgeronde taken in de agenda', 'Afgevinkte taken blijven doorgestreept op hun dag staan', prefs.agendaDone)}
+        <p class="set-note">Deze instellingen gelden voor dit apparaat.</p>
+      </section>
+      <section class="set-sec" id="setLogin"></section>
+    </div>`;
+  modal.hidden = false;
+
+  const login = $('#setLogin');
+  const renderLogin = () => {
+    const a = state.auth;
+    if (a.source === 'env') {
+      login.innerHTML = `
+        <h4>Inloggen</h4>
+        <p class="set-text">Inloggen staat aan als <b>${esc(a.user)}</b>. Dat is ingesteld met <code>APP_PASSWORD_HASH</code> of <code>APP_PASSWORD</code> in je stack- of compose-bestand; wijzig of verwijder het daar.</p>
+        <div class="set-actions"><button type="button" class="btn small" data-act="others">Andere apparaten uitloggen</button></div>`;
+      return;
+    }
+    const on = a.enabled ? mode !== 'off' : mode === 'setup';
+    let body = '';
+    if (mode === 'setup' || mode === 'change') {
+      body = `
+        <form class="set-form" data-form="${mode}">
+          ${mode === 'change' ? '<label class="set-field"><span>Huidig wachtwoord</span><input class="input" type="password" name="current" autocomplete="current-password" required></label>' : ''}
+          <label class="set-field"><span>Gebruikersnaam</span><input class="input" name="username" autocomplete="username" maxlength="80" required value="${esc(a.user || 'admin')}"></label>
+          <label class="set-field"><span>${mode === 'change' ? 'Nieuw wachtwoord' : 'Wachtwoord'}</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="8" required placeholder="Minimaal 8 tekens"></label>
+          <label class="set-field"><span>Herhaal wachtwoord</span><input class="input" type="password" name="repeat" autocomplete="new-password" minlength="8" required></label>
+          <p class="set-error" hidden></p>
+          <p class="set-note">${mode === 'change' ? 'Andere apparaten worden uitgelogd; hier blijf je ingelogd.' : 'Je blijft op dit apparaat ingelogd. Wachtwoord kwijt? Zie <i>Inloggen</i> in de README.'}</p>
+          <div class="set-actions">
+            <button type="button" class="btn ghost small" data-act="cancel">Annuleren</button>
+            <button type="submit" class="btn primary small">${mode === 'change' ? 'Opslaan' : 'Inloggen aanzetten'}</button>
+          </div>
+        </form>`;
+    } else if (mode === 'off') {
+      body = `
+        <form class="set-form" data-form="off">
+          <label class="set-field"><span>Huidig wachtwoord</span><input class="input" type="password" name="current" autocomplete="current-password" required></label>
+          <p class="set-error" hidden></p>
+          <p class="set-note">Zonder inlog kan iedereen die de app kan bereiken bij je taken. Alle apparaten worden uitgelogd.</p>
+          <div class="set-actions">
+            <button type="button" class="btn ghost small" data-act="cancel">Annuleren</button>
+            <button type="submit" class="btn danger small">Inloggen uitzetten</button>
+          </div>
+        </form>`;
+    } else if (a.enabled) {
+      body = `
+        <p class="set-text">Je bent ingelogd als <b>${esc(a.user)}</b>.</p>
+        <div class="set-actions">
+          <button type="button" class="btn small" data-act="change">Wachtwoord wijzigen</button>
+          <button type="button" class="btn ghost small" data-act="others">Andere apparaten uitloggen</button>
+        </div>`;
+    }
+    login.innerHTML = `
+      <h4>Inloggen</h4>
+      ${switchRow('login', 'Inloggen vereist', 'Vraag om gebruikersnaam en wachtwoord voordat je bij je taken kunt', on)}
+      ${body}`;
+    $('.set-form input:not([value]), .set-form input[name="current"]', login)?.focus();
+  };
+  renderLogin();
+
+  const close = () => { modal.hidden = true; modal.innerHTML = ''; modal.onsubmit = modal.onchange = null; $('#settingsBtn').focus(); };
+  modal.onclick = (e) => {
+    if (e.target === modal || e.target.closest('[data-act="close"]')) return close();
+    const segBtn = e.target.closest('[data-seg] [data-value]');
+    if (segBtn) {
+      const pref = segBtn.parentElement.dataset.seg;
+      segBtn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === segBtn));
+      if (pref === 'theme') applyTheme(segBtn.dataset.value);
+      if (pref === 'weeks') { state.agendaWeeks = Number(segBtn.dataset.value); store.set('weeks', state.agendaWeeks); renderHeader(); renderList(); }
+      return;
+    }
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'change') { mode = 'change'; renderLogin(); }
+    if (act === 'cancel') { mode = null; renderLogin(); }
+    if (act === 'others') {
+      api('DELETE', '/api/sessions/others')
+        .then((r) => toast(r.ended ? `${r.ended} ${r.ended === 1 ? 'andere sessie' : 'andere sessies'} uitgelogd` : 'Geen andere apparaten ingelogd'))
+        .catch((err) => toast('Uitloggen mislukt: ' + err.message));
+    }
+  };
+  modal.onchange = (e) => {
+    const pref = e.target.dataset.pref;
+    if (e.target.id === 'setStart') store.set('start', e.target.value);
+    if (pref === 'weekend' || pref === 'agendaDone') { store.set(pref, e.target.checked ? '1' : '0'); renderList(); }
+    if (pref === 'login') { mode = state.auth.enabled ? (e.target.checked ? null : 'off') : (e.target.checked ? 'setup' : null); renderLogin(); }
+  };
+  modal.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const error = $('.set-error', f);
+    const fail = (msg) => { error.textContent = msg; error.hidden = false; };
+    if (f.dataset.form !== 'off' && f.password.value !== f.repeat.value) return fail('De wachtwoorden zijn niet gelijk.');
+    const button = $('[type="submit"]', f);
+    button.disabled = true;
+    try {
+      if (f.dataset.form === 'off') {
+        await api('DELETE', '/api/auth', { current_password: f.current.value });
+        toast('Inloggen staat uit');
+      } else {
+        await api('POST', '/api/auth', { current_password: f.current?.value, username: f.username.value.trim(), password: f.password.value });
+        toast(f.dataset.form === 'change' ? 'Inlog gewijzigd' : 'Inloggen staat aan');
+      }
+      mode = null;
+      await load();
+      renderLogin();
+    } catch (err) {
+      button.disabled = false;
+      fail(err.message);
+    }
+  };
+  modal.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  $('[data-act="close"]', modal).focus();
+}
+
 /* ---------- Toast ---------- */
 let toastTimer;
 function toast(msg, actionLabel, action) {
@@ -1019,7 +1189,7 @@ function bind() {
     if (nav) state.agendaOffset = Number(nav.dataset.agenda) === 0 ? 0 : state.agendaOffset + Number(nav.dataset.agenda);
     if (weeks || nav) { renderHeader(); renderList(); }
   });
-  $('#brandHome').addEventListener('click', () => { state.agendaOffset = 0; setView('agenda'); });
+  $('#brandHome').addEventListener('click', () => { state.agendaOffset = 0; setView(prefs.start); });
 
   const list = $('#listWrap');
   list.addEventListener('click', (e) => {
@@ -1161,10 +1331,11 @@ function bind() {
   $('#themeToggle').addEventListener('click', () => {
     const root = document.documentElement;
     const dark = root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-    root.dataset.theme = dark ? 'light' : 'dark';
-    store.set('theme', root.dataset.theme);
-    renderSidebar();
+    applyTheme(dark ? 'light' : 'dark');
   });
+  // Following the system theme: keep the toggle's icon in step when the system switches.
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderSidebar);
+  $('#settingsBtn').addEventListener('click', settingsDialog);
 
   $('#logoutBtn').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
@@ -1189,6 +1360,7 @@ function bind() {
     }
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); $('#newTitle').focus(); }
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
+    else if (e.key === ',') { e.preventDefault(); settingsDialog(); }
     else {
       const view = Object.entries(VIEWS).find(([, v]) => v.key === e.key);
       if (view) setView(view[0]);
@@ -1219,7 +1391,7 @@ function renderChips() {
 async function load() {
   try {
     const data = await api('GET', '/api/state');
-    const auth = data.auth || {};
+    const auth = state.auth = data.auth || {};
     $('#logoutBtn').hidden = !auth.enabled;
     if (auth.enabled) $('#logoutBtn').title = `Uitloggen (${auth.user})`;
     state.clients = data.clients || [];

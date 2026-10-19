@@ -9,6 +9,8 @@ Configuration via environment variables:
   APP_USER           login username                         (default "admin")
   APP_PASSWORD       enables the login page when set
   APP_PASSWORD_HASH  same, but hashed; create one with `python server.py hash-password`
+                     Without either, a login can be set up in the app's settings
+                     (stored in the database); `python server.py reset-login` removes it.
   SESSION_DAYS       how long "ingelogd blijven" lasts         (default 30)
   COOKIE_SECURE      true / false / auto (auto: only behind an HTTPS proxy)
   APP_VERSION        version shown in the app                  (set at image build time)
@@ -36,7 +38,7 @@ DB_PATH = os.environ.get("DB_PATH", "data/klaar.db")
 APP_USER = os.environ.get("APP_USER", "admin")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 APP_PASSWORD_HASH = os.environ.get("APP_PASSWORD_HASH", "")
-AUTH_ENABLED = bool(APP_PASSWORD or APP_PASSWORD_HASH)
+ENV_AUTH = bool(APP_PASSWORD or APP_PASSWORD_HASH)  # wins over a login set up in the app
 SESSION_DAYS = int(os.environ.get("SESSION_DAYS", "30"))
 SHORT_SESSION = 12 * 3600  # without "ingelogd blijven"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "auto").lower()
@@ -74,6 +76,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
     expires_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS todos (
     id           INTEGER PRIMARY KEY,
@@ -183,6 +189,17 @@ class Store:
         with self.lock:
             self.conn.executemany(sql, seq)
             self.conn.commit()
+
+    def setting(self, key):
+        row = self.one("SELECT value FROM settings WHERE key=?", (key,))
+        return row["value"] if row else None
+
+    def set_setting(self, key, value):
+        if value is None:
+            self.execute("DELETE FROM settings WHERE key=?", (key,))
+        else:
+            self.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
+                         "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
 
 
 def todo_out(row, category_ids):
@@ -314,7 +331,10 @@ def clean_group(store, table, data, partial):
 
 
 def get_state(store, _body):
-    state = {"version": APP_VERSION, "auth": {"enabled": AUTH_ENABLED, "user": APP_USER if AUTH_ENABLED else None}}
+    auth = auth_config(store)
+    state = {"version": APP_VERSION, "auth": {
+        "enabled": bool(auth), "user": auth["user"] if auth else None, "source": auth["source"] if auth else None,
+    }}
     for table in GROUPS:
         state[table] = store.query(f"SELECT * FROM {table} ORDER BY position, id")
     labels = {}
@@ -457,20 +477,43 @@ def hash_password(password, iterations=HASH_ITERATIONS):
     return f"pbkdf2_sha256:{iterations}:{salt}:{digest}"
 
 
-def check_credentials(user, password):
-    user_ok = hmac.compare_digest(user.encode(), APP_USER.encode())
-    if APP_PASSWORD_HASH:
-        try:
-            algo, iterations, salt, digest = APP_PASSWORD_HASH.split(":")
-            assert algo == "pbkdf2_sha256"
-            candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), int(iterations)).hex()
-        except (ValueError, AssertionError):
+def verify_hash(stored, password):
+    """True/False for a hash made by hash_password(); None if the hash itself is malformed."""
+    try:
+        algo, iterations, salt, digest = stored.split(":")
+        if algo != "pbkdf2_sha256":
+            return None
+        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), int(iterations)).hex()
+    except ValueError:
+        return None
+    return hmac.compare_digest(candidate.encode(), digest.encode())
+
+
+def auth_config(store):
+    """The active login, or None when the app is open. Environment variables win
+    over a login set up in the app's settings."""
+    if ENV_AUTH:
+        return {"source": "env", "user": APP_USER}
+    pw_hash = store.setting("auth_password_hash")
+    if pw_hash:
+        return {"source": "app", "user": store.setting("auth_user") or APP_USER, "hash": pw_hash}
+    return None
+
+
+def check_credentials(store, user, password):
+    auth = auth_config(store)
+    if not auth:
+        return False
+    user_ok = hmac.compare_digest(user.encode(), auth["user"].encode())
+    if auth["source"] == "app":
+        pw_ok = verify_hash(auth["hash"], password)
+    elif APP_PASSWORD_HASH:
+        pw_ok = verify_hash(APP_PASSWORD_HASH, password)
+        if pw_ok is None:
             print("APP_PASSWORD_HASH heeft een ongeldig formaat", flush=True)
-            return False
-        pw_ok = hmac.compare_digest(candidate.encode(), digest.encode())
     else:
         pw_ok = hmac.compare_digest(password.encode(), APP_PASSWORD.encode())
-    return user_ok and pw_ok
+    return bool(user_ok and pw_ok)
 
 
 def token_hash(token):
@@ -549,7 +592,7 @@ class Handler(BaseHTTPRequestHandler):
         return bool(row and row["expires_at"] > time.time())
 
     def authorized(self):
-        if not AUTH_ENABLED or self.has_session():
+        if not auth_config(self.store) or self.has_session():
             return True
         # Basic auth keeps working for scripts and other API clients (same attempt limit as the login page).
         header = self.headers.get("Authorization", "")
@@ -561,7 +604,7 @@ class Handler(BaseHTTPRequestHandler):
                 user, _, pw = base64.b64decode(header[6:]).decode().partition(":")
             except Exception:
                 return False
-            if check_credentials(user, pw):
+            if check_credentials(self.store, user, pw):
                 return True
             throttle.failed(addr)
         return False
@@ -584,24 +627,8 @@ class Handler(BaseHTTPRequestHandler):
             parts.append("Secure")
         return "; ".join(parts)
 
-    def login(self):
-        if not AUTH_ENABLED:
-            return self.send_json(200, {"ok": True})
-        addr = self.client_address[0]
-        wait = throttle.retry_after(addr)
-        if wait:
-            minutes = max(1, round(wait / 60))
-            return self.send_json(429, {"error": f"Te veel pogingen. Probeer het over {minutes} min opnieuw."},
-                                  {"Retry-After": str(wait)})
-        body = self.read_body()
-        user = str(body.get("username") or "")
-        password = str(body.get("password") or "")
-        if not check_credentials(user, password):
-            throttle.failed(addr)
-            print(f"{addr} mislukte inlogpoging voor '{user[:40]}'", flush=True)
-            return self.send_json(401, {"error": "Onjuiste gebruikersnaam of wachtwoord."})
-        throttle.succeeded(addr)
-        remember = bool(body.get("remember"))
+    def start_session(self, remember):
+        """Create a session and return the Set-Cookie header for it."""
         lifetime = SESSION_DAYS * 86400 if remember else SHORT_SESSION
         token = secrets.token_urlsafe(32)
         self.store.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))
@@ -610,13 +637,78 @@ class Handler(BaseHTTPRequestHandler):
             (token_hash(token), now(), time.time() + lifetime),
         )
         # Without "ingelogd blijven" the cookie ends with the browser session (and after 12 hours at most).
-        self.send_json(200, {"ok": True}, {"Set-Cookie": self.cookie_header(token, lifetime if remember else None)})
+        return {"Set-Cookie": self.cookie_header(token, lifetime if remember else None)}
+
+    def throttled(self, addr):
+        """Send a 429 and return True when this address made too many failed attempts."""
+        wait = throttle.retry_after(addr)
+        if wait:
+            minutes = max(1, round(wait / 60))
+            self.send_json(429, {"error": f"Te veel pogingen. Probeer het over {minutes} min opnieuw."},
+                           {"Retry-After": str(wait)})
+        return bool(wait)
+
+    def login(self):
+        if not auth_config(self.store):
+            return self.send_json(200, {"ok": True})
+        addr = self.client_address[0]
+        if self.throttled(addr):
+            return
+        body = self.read_body()
+        user = str(body.get("username") or "")
+        password = str(body.get("password") or "")
+        if not check_credentials(self.store, user, password):
+            throttle.failed(addr)
+            print(f"{addr} mislukte inlogpoging voor '{user[:40]}'", flush=True)
+            return self.send_json(401, {"error": "Onjuiste gebruikersnaam of wachtwoord."})
+        throttle.succeeded(addr)
+        self.send_json(200, {"ok": True}, self.start_session(bool(body.get("remember"))))
 
     def logout(self):
         token = self.session_token()
         if token:
             self.store.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash(token),))
         self.send_json(200, {"ok": True}, {"Set-Cookie": self.cookie_header("", 0)})
+
+    def change_login(self):
+        """Set up or change (POST), or turn off (DELETE) the login from the settings.
+        With a login in place this needs the current password; other devices are logged out."""
+        auth = auth_config(self.store)
+        if auth and auth["source"] == "env":
+            return self.send_json(409, {"error": "Inloggen is ingesteld via APP_PASSWORD_HASH of APP_PASSWORD; wijzig het daar."})
+        body = self.read_body()
+        if auth:
+            addr = self.client_address[0]
+            if self.throttled(addr):
+                return
+            if not check_credentials(self.store, auth["user"], str(body.get("current_password") or "")):
+                throttle.failed(addr)
+                # 403 rather than 401: the app sends any 401 straight to the login page.
+                return self.send_json(403, {"error": "Je huidige wachtwoord klopt niet."})
+            throttle.succeeded(addr)
+        if self.command == "DELETE":
+            self.store.set_setting("auth_password_hash", None)
+            self.store.set_setting("auth_user", None)
+            self.store.execute("DELETE FROM sessions")
+            return self.send_json(200, {"ok": True}, {"Set-Cookie": self.cookie_header("", 0)})
+        user = str(body.get("username") or "").strip()
+        password = str(body.get("password") or "")
+        if not user or len(user) > 80:
+            raise BadRequest("Kies een gebruikersnaam van maximaal 80 tekens.")
+        if len(password) < 8:
+            raise BadRequest("Kies een wachtwoord van minimaal 8 tekens.")
+        if len(password) > 1024:
+            raise BadRequest("Dat wachtwoord is te lang.")
+        self.store.set_setting("auth_user", user)
+        self.store.set_setting("auth_password_hash", hash_password(password))
+        # Every existing session ends; this browser gets a fresh one and stays logged in.
+        self.store.execute("DELETE FROM sessions")
+        self.send_json(200, {"ok": True}, self.start_session(remember=True))
+
+    def logout_others(self):
+        current = token_hash(self.session_token() or "")
+        n = self.store.execute("DELETE FROM sessions WHERE token_hash != ?", (current,)).rowcount
+        self.send_json(200, {"ok": True, "ended": n})
 
     def redirect(self, location):
         self.send_response(303)
@@ -663,6 +755,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_static(path)
             nxt = quote(self.path, safe="/")
             return self.redirect("/login" + (f"?next={nxt}" if self.path not in ("/", "") else ""))
+        try:
+            if path == "/api/auth" and self.command in ("POST", "DELETE"):
+                return self.change_login()
+        except BadRequest as e:
+            return self.send_json(400, {"error": str(e)})
+        if path == "/api/sessions/others" and self.command == "DELETE":
+            return self.logout_others()
         if path.startswith("/api/"):
             return self.handle_api(path)
         if self.command in ("GET", "HEAD"):
@@ -716,12 +815,30 @@ def hash_password_cli():
     print(f"      APP_PASSWORD_HASH: \"{hash_password(password)}\"")
 
 
+def reset_login_cli():
+    """The way back in after forgetting a password set up in the app."""
+    store = Store(DB_PATH)
+    had_login = bool(store.setting("auth_password_hash"))
+    store.set_setting("auth_password_hash", None)
+    store.set_setting("auth_user", None)
+    store.execute("DELETE FROM sessions")
+    if had_login:
+        print("Inloggen via de app staat uit. Stel een nieuw wachtwoord in via Instellingen.")
+    else:
+        print("Er was geen inlog ingesteld in de app.")
+    if ENV_AUTH:
+        print("Let op: APP_PASSWORD_HASH of APP_PASSWORD is gezet, dus de inlogpagina blijft aan.")
+
+
 def main():
     if sys.argv[1:2] == ["hash-password"]:
         return hash_password_cli()
+    if sys.argv[1:2] == ["reset-login"]:
+        return reset_login_cli()
     Handler.store = Store(DB_PATH)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    auth = f"aan (gebruiker: {APP_USER})" if AUTH_ENABLED else "uit"
+    login = auth_config(Handler.store)
+    auth = f"aan (gebruiker: {login['user']})" if login else "uit"
     print(f"ToDo {APP_VERSION} draait op http://0.0.0.0:{PORT}  (db: {DB_PATH}, inloggen: {auth})", flush=True)
     try:
         server.serve_forever()
